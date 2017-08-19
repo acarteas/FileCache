@@ -1,5 +1,7 @@
 <h1>FileCache Documentation</h1>
-<h1>Usage</h1>
+<h2>How to Install FileCache</h2>
+The easiest way to get FileCache into your project is via NuGet, where you can find both <a href="https://www.nuget.org/packages/FileCache.Signed">signed</a> and <a href="https://www.nuget.org/packages/FileCache">unsigned</a> versions of the DLLs.  Not sure which one to use?  Unless you are working with other signed projects (not common), you should probably download the <a href="https://www.nuget.org/packages/FileCache">unsigned</a> version.
+<h2>Usage</h2>
 <p>Using the file cache is fairly straightforward.&nbsp; After adding FileCache and System.Runtime.Caching references to your project, add the appropriate using statement:</p>
 <pre>using System.Runtime.Caching;</pre>
 <p>Note that I&rsquo;ve placed my FileCache code inside the same namespace as the default .NET caching namespace for simplicity.&nbsp; Below are two examples of how to use FileCache:</p>
