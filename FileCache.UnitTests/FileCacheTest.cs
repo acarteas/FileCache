@@ -1,10 +1,10 @@
 ﻿/*
-Copyright 2012, 2013 Adam Carter (http://adam-carter.com)
+Copyright 2012, 2013, 2017 Adam Carter (http://adam-carter.com)
 
-This file is part of FileCache (http://fc.codeplex.com).
+This file is part of FileCache (http://github.com/acarteas/FileCache).
 
-FileCache is distributed under the Microsoft Public License (Ms-PL).
-Consult "LICENSE.txt" included in this package for the complete Ms-PL license.
+FileCache is distributed under the Apache License 2.0.
+Consult "LICENSE.txt" included in this package for the Apache License 2.0.
 */
 using System.Runtime.Caching;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -23,28 +23,11 @@ namespace FC.UnitTests
     ///This is a test class for FileCacheTest and is intended
     ///to contain all FileCacheTest Unit Tests
     ///</summary>
-    [TestClass()]
+    [TestClass]
     public class FileCacheTest
     {
 
-
-        private TestContext testContextInstance;
-
-        /// <summary>
-        ///Gets or sets the test context which provides
-        ///information about and functionality for the current test run.
-        ///</summary>
-        public TestContext TestContext
-        {
-            get
-            {
-                return testContextInstance;
-            }
-            set
-            {
-                testContextInstance = value;
-            }
-        }
+        
 
         #region Additional test attributes
         // 
@@ -325,6 +308,30 @@ namespace FC.UnitTests
             cacheWithDefaultRegion["foo"] = "bar";
             object pull = defaultCache.Get("foo", "foo");
             Assert.AreEqual("bar", pull.ToString());
+        }
+
+        /// <summary>
+        /// Generated to debug and address github issue #2
+        /// </summary>
+        [TestMethod]
+        public void CustomRegionTest()
+        {
+            var cache = new FileCache();
+            var policy = new CacheItemPolicy { SlidingExpiration = new TimeSpan(0, 5, 0) };
+
+            var key = "my_key";
+            var region = "my_region";
+            object value = null;
+
+            cache.Add(key, "foo", policy, region);
+            cache.Add(key, "bar", policy);
+
+            value = cache.Get(key); // returns: "bar"
+            Assert.AreEqual("bar", value);
+            value = cache.Get(key, region); // returns: "foo"
+            Assert.AreEqual("foo", value);
+            value = cache.Get(key); // returns: "foo" ?!
+            Assert.AreEqual("bar", value);
         }
 
         [TestMethod]

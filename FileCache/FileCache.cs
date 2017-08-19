@@ -1,10 +1,10 @@
 ﻿/*
-Copyright 2012, 2013 Adam Carter (http://adam-carter.com)
+Copyright 2012, 2013, 2017 Adam Carter (http://adam-carter.com)
 
-This file is part of FileCache (http://fc.codeplex.com).
+This file is part of FileCache (http://github.com/acarteas/FileCache).
 
-FileCache is distributed under the Microsoft Public License (Ms-PL).
-Consult "LICENSE.txt" included in this package for the complete Ms-PL license.
+FileCache is distributed under the Apache License 2.0.
+Consult "LICENSE.txt" included in this package for the Apache License 2.0.
 */
 using System;
 using System.Collections;
@@ -972,7 +972,7 @@ namespace System.Runtime.Caching
                     if (payload.Policy.SlidingExpiration > new TimeSpan())
                     {
                         payload.Policy.AbsoluteExpiration = DateTime.Now.Add(payload.Policy.SlidingExpiration);
-                        WriteFile(cachedItemPath, payload);
+                        WriteFile(cachedItemPath, payload, regionName);
                     }
 
                     //update the file's access time
