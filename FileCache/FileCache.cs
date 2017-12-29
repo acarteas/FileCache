@@ -604,9 +604,13 @@ namespace System.Runtime.Caching
                 try
                 {
                     if (lockfile)
+                    {
                         stream = File.Open(path, mode, access, FileShare.None);
+                    }
                     else
-                        stream = File.Open(path, mode, access);
+                    {
+                        stream = File.Open(path, mode, access, FileShare.ReadWrite);
+                    }
                 }
                 catch (IOException ex)
                 {
