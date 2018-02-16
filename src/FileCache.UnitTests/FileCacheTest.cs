@@ -135,6 +135,8 @@ namespace FC.UnitTests
             cacheSize.Should().NotBe(0);
 
             _cache.Remove("foo");
+            cacheSize = _cache.GetCacheSize();
+            cacheSize.Should().Be(0);
             cacheSize = _cache.CurrentCacheSize;
             cacheSize.Should().Be(0);
         }
@@ -384,6 +386,38 @@ namespace FC.UnitTests
 
             _cache["foo"].Should().BeNull();
             _cache["bar"].Should().NotBeNull();
+        }
+
+        [TestMethod]
+        public void RawFileCacheTest()
+        {
+            // Test with filename based payload
+            FileCache perfCache = new FileCache("filePayload");
+            perfCache.PayloadReadMode = FileCache.PayloadMode.Filename;
+            perfCache.PayloadWriteMode = FileCache.PayloadMode.RawBytes;
+
+            perfCache["mybytes"] = new byte[] { 4, 2 };
+            perfCache.Get("mybytes").Should().BeOfType(typeof(string));
+            File.Exists((string)perfCache.Get("mybytes")).Should().BeTrue();
+        }
+
+
+        [TestMethod]
+        public void RawFileWithExpiryTest()
+        {
+            // Test with sliding expiry
+            FileCache perfCacheWithExpiry = new FileCache("filePayloadExpiry");
+            var pol = new CacheItemPolicy();
+            pol.SlidingExpiration = new TimeSpan(0, 0, 2);
+            perfCacheWithExpiry.DefaultPolicy = pol;
+            perfCacheWithExpiry.FilenameAsPayloadSafetyMargin = new TimeSpan(0, 0, 1);
+            perfCacheWithExpiry.PayloadReadMode = FileCache.PayloadMode.Filename;
+            perfCacheWithExpiry.PayloadWriteMode = FileCache.PayloadMode.RawBytes;
+
+            perfCacheWithExpiry["mybytes"] = new byte[] { 4, 2 };
+            File.Exists((string)perfCacheWithExpiry.Get("mybytes")).Should().BeTrue();
+            Thread.Sleep(2000);
+            perfCacheWithExpiry.Get("mybytes").Should().BeNull();
         }
     }
 }
