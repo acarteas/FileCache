@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net40;net45;netstandard2.0</TargetFrameworks>
+	  <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageTags>cache objectcache System.Runtime.Caching.ObjectCache</PackageTags>
+    <PackageLicenseUrl>https://github.com/acarteas/FileCache/blob/master/LICENSE</PackageLicenseUrl>
+    <PackageProjectUrl>https://github.com/acarteas/FileCache</PackageProjectUrl>
+    <Authors>Adam Carter</Authors>
+    <Description>FileCache is a concrete implementation of the .NET System.Runtime.Caching.ObjectCache that uses the local filesystem as the target location.</Description>
+    <Copyright>Copyright (c) 2012, 2013, 2017 Adam Carter (http://adam-carter.com)</Copyright>
+    <UpdateVersionProperties>true</UpdateVersionProperties>
+    <Version>0.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="GitVersionTask" Version="4.0.0-beta*">
+      <PrivateAssets>All</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net40' ">
+    <Reference Include="System.Runtime.Caching" />
+  </ItemGroup>
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net45' ">
+    <Reference Include="System.Runtime.Caching" />
+  </ItemGroup>
+  <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.0' ">
+    <PackageReference Include="System.Runtime.Caching" Version="4.5.0-preview2-26406-04" />
+  </ItemGroup>
+</Project>
