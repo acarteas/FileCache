@@ -1,0 +1,34 @@
+artifacts:
+  path: 'artifacts\**'
+
+configuration: Debug
+
+image: Visual Studio 2017
+
+build_script:
+  - cmd: powershell -NoProfile -ExecutionPolicy unrestricted -Command .\build.ps1
+
+# Cake performs the tests
+test: off
+
+skip_tags: true
+
+# We can override common configuration from above
+for:
+
+-
+  branches:
+    only:
+      - master
+
+  configuration: Release
+
+-
+  # Branches considered PRs
+  branches:
+    except:
+      - master
+      - develop
+
+  environment:
+      BUILD_REASON: PullRequest
