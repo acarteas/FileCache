@@ -11,7 +11,7 @@ build_script:
 # Cake performs the tests
 test: off
 
-skip_tags: true
+skip_tags: false
 
 # We can override common configuration from above
 for:
@@ -24,11 +24,9 @@ for:
   configuration: Release
 
 -
-  # Branches considered PRs
   branches:
     except:
       - master
       - develop
 
-  environment:
-      BUILD_REASON: PullRequest
+  skip_tags: true

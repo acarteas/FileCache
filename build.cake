@@ -15,7 +15,7 @@ var target = Argument("target", "Default");
 // Build Configuration
 var configuration = EnvironmentVariable("CONFIGURATION") ?? "Release";
 var isAppVeyorBuild = EnvironmentVariable("APPVEYOR") == "True";
-var isPullRequest = EnvironmentVariable("BUILD_REASON") == "PullRequest";
+var isPullRequest = EnvironmentVariable("APPVEYOR_PULL_REQUEST_NUMBER") != null;
 
 // File/Directory paths
 var artifactDirectory = MakeAbsolute(Directory("./artifacts")).FullPath;
