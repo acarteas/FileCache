@@ -1,7 +1,7 @@
 FileCache Documentation
 =======================
 
-[![Build status](https://ci.appveyor.com/api/projects/status/xuh46e17j03xbaqj?svg=true)](https://ci.appveyor.com/project/maldworth/filecache)  
+[![Build status](https://ci.appveyor.com/api/projects/status/pbeexohyjblb7mww?svg=true)](https://ci.appveyor.com/project/acarteas/filecache)  
 [![NuGet](https://img.shields.io/nuget/v/filecache.svg)](https://www.nuget.org/packages/FileCache/)  
 [![NuGet](https://img.shields.io/nuget/v/filecache.signed.svg)](https://www.nuget.org/packages/FileCache.Signed/)
 
