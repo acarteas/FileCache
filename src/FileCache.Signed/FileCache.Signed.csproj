@@ -11,8 +11,9 @@
     <AssemblyOriginatorKeyFile>..\..\fckey.snk</AssemblyOriginatorKeyFile>
     <SignAssembly>True</SignAssembly>
 	  <PublicSign Condition="'$(OS)' != 'Windows_NT'">true</PublicSign>
-    <UpdateVersionProperties>true</UpdateVersionProperties>
-    <Version>0.0.0</Version>
+    <UpdateVersionProperties>false</UpdateVersionProperties>
+    <Version>2.1.1</Version>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\FileCache\FileCache.cs" Link="FileCache.cs" />
