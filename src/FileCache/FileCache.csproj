@@ -8,9 +8,8 @@
     <Authors>Adam Carter</Authors>
     <Description>FileCache is a concrete implementation of the .NET System.Runtime.Caching.ObjectCache that uses the local filesystem as the target location.</Description>
     <Copyright>Copyright (c) 2012, 2013, 2017 Adam Carter (http://adam-carter.com)</Copyright>
-    <UpdateVersionProperties>false</UpdateVersionProperties>
-    <Version>2.1.1</Version>
-    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <UpdateVersionProperties>true</UpdateVersionProperties>
+    <Version>0.0.0</Version>
     <Company>Adam Carter</Company>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net40|AnyCPU'">
@@ -30,6 +29,6 @@
     <Reference Include="System.Runtime.Caching" />
   </ItemGroup>
   <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.0' ">
-    <PackageReference Include="System.Runtime.Caching" Version="4.5.0-preview2-26406-04" />
+    <PackageReference Include="System.Runtime.Caching" Version="4.5.0" />
   </ItemGroup>
 </Project>
