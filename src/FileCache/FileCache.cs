@@ -831,7 +831,7 @@ namespace System.Runtime.Caching
                 regionName = "";
             }
             string directory = Path.Combine(CacheDir, _cacheSubFolder, regionName);
-            string filePath = Path.Combine(directory, Path.GetFileNameWithoutExtension(FileName) + ".dat");
+            string filePath = Path.Combine(directory, FileName + ".dat");
             if (!Directory.Exists(directory))
             {
                 Directory.CreateDirectory(directory);

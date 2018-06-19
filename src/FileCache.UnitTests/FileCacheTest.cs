@@ -47,6 +47,25 @@ namespace FC.UnitTests
         }
 
         [TestMethod]
+        public void CacheNameCollisionTest()
+        {
+            // given
+            _cache = new FileCache();
+            CacheItemPolicy policy =
+                new CacheItemPolicy
+                {
+                    AbsoluteExpiration = (DateTimeOffset) DateTime.Now.AddMinutes(30)
+                };
+
+            // when
+            _cache.Set("test.1", "Red", policy);
+            _cache.Set("test.2", "Blue", policy);
+
+            // then
+            _cache.Get("test.1").Should().Be("Red");
+        }
+
+        [TestMethod]
         public void PolicySaveTest()
         {
             _cache = new FileCache();
