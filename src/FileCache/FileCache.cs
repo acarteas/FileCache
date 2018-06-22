@@ -32,6 +32,12 @@ namespace System.Runtime.Caching
         private long _currentCacheSize = 0;
         public string CacheDir { get; protected set; }
 
+        /// <summary>
+        /// Used to abstract away the low-level details of file management.  This allows
+        /// for multiple file formatting schemes based on use case.  
+        /// </summary>
+        public FileCacheManager CacheManager { get; protected set; }
+
 
         /// <summary>
         /// Used to store the default region when accessing the cache via [] calls
@@ -48,7 +54,17 @@ namespace System.Runtime.Caching
         /// available.  Default (00:00:00) is indefinite.  Should the timeout be
         /// reached, an exception will be thrown.
         /// </summary>
-        public TimeSpan AccessTimeout { get; set; }
+        public TimeSpan AccessTimeout
+        {
+            get
+            {
+                return CacheManager.AccessTimeout;
+            }
+            set
+            {
+                CacheManager.AccessTimeout = value;
+            }
+        }
 
         /// <summary>
         /// Used to specify the disk size, in bytes, that can be used by the File Cache
@@ -66,7 +82,7 @@ namespace System.Runtime.Caching
                 if (_currentCacheSize == 0)
                 {
                     // Read the system file for cache size
-                    object cacheSizeObj = ReadSysFile(CacheSizeFile);
+                    object cacheSizeObj = CacheManager.ReadSysFile(CacheSizeFile);
 
                     // Did we successfully get data from the file?
                     if (cacheSizeObj != null)
@@ -82,7 +98,7 @@ namespace System.Runtime.Caching
                 // no need to do a pointless re-store of the same value
                 if (_currentCacheSize != value || value == 0)
                 {
-                    WriteSysFile(CacheSizeFile, value);
+                    CacheManager.WriteSysFile(CacheSizeFile, value);
                     _currentCacheSize = value;
                 }
             } 
@@ -116,11 +132,15 @@ namespace System.Runtime.Caching
         /// use case.
         /// </param>
         /// <param name="cleanInterval">If supplied, sets the interval of time that must occur between self cleans</param>
-        public FileCache(bool calculateCacheSize = false, TimeSpan cleanInterval = new TimeSpan())
+        public FileCache(
+            bool calculateCacheSize = false,
+            TimeSpan cleanInterval = new TimeSpan(),
+            FileCacheManagers manager = FileCacheManagers.Basic
+            )
         {
             // CT note: I moved this code to an init method because if the user specified a cache root, that needs to
             // be set before checking if we should clean (otherwise it will look for the file in the wrong place)
-            Init(calculateCacheSize, cleanInterval);
+            Init(calculateCacheSize, cleanInterval, true, true, manager);
         }
 
         /// <summary>
@@ -132,10 +152,15 @@ namespace System.Runtime.Caching
         /// use case.
         /// </param>
         /// <param name="cleanInterval">If supplied, sets the interval of time that must occur between self cleans</param>
-        public FileCache(string cacheRoot, bool calculateCacheSize = false, TimeSpan cleanInterval = new TimeSpan())
+        public FileCache(
+            string cacheRoot,
+            bool calculateCacheSize = false,
+            TimeSpan cleanInterval = new TimeSpan(),
+            FileCacheManagers manager = FileCacheManagers.Basic
+            )
         {
             CacheDir = cacheRoot;
-            Init(calculateCacheSize, cleanInterval, false);
+            Init(calculateCacheSize, cleanInterval, false, true, manager);
         }
 
         /// <summary>
@@ -149,10 +174,15 @@ namespace System.Runtime.Caching
         /// use case.
         /// </param>
         /// <param name="cleanInterval">If supplied, sets the interval of time that must occur between self cleans</param>
-        public FileCache(SerializationBinder binder, bool calculateCacheSize = false, TimeSpan cleanInterval = new TimeSpan())
+        public FileCache(
+            SerializationBinder binder,
+            bool calculateCacheSize = false,
+            TimeSpan cleanInterval = new TimeSpan(),
+            FileCacheManagers manager = FileCacheManagers.Basic
+            )
         {
             _binder = binder;
-            Init(calculateCacheSize, cleanInterval, true, false);
+            Init(calculateCacheSize, cleanInterval, true, false, manager);
         }
 
         /// <summary>
@@ -166,25 +196,36 @@ namespace System.Runtime.Caching
         /// use case.
         /// </param>
         /// <param name="cleanInterval">If supplied, sets the interval of time that must occur between self cleans</param>
-        public FileCache(string cacheRoot, SerializationBinder binder, bool calculateCacheSize = false, TimeSpan cleanInterval = new TimeSpan())
+        public FileCache(
+            string cacheRoot,
+            SerializationBinder binder,
+            bool calculateCacheSize = false,
+            TimeSpan cleanInterval = new TimeSpan(),
+            FileCacheManagers manager = FileCacheManagers.Basic
+            )
         {
             _binder = binder;
             CacheDir = cacheRoot;
-            Init(calculateCacheSize, cleanInterval, false, false);
+            Init(calculateCacheSize, cleanInterval, false, false, manager);
         }
 
         #endregion
 
         #region custom methods
 
-        private void Init(bool calculateCacheSize = false, TimeSpan cleanInterval = new TimeSpan(), bool setCacheDirToDefault = true, bool setBinderToDefault = true)
+        private void Init(
+            bool calculateCacheSize = false,
+            TimeSpan cleanInterval = new TimeSpan(),
+            bool setCacheDirToDefault = true,
+            bool setBinderToDefault = true,
+            FileCacheManagers manager = FileCacheManagers.Basic
+            )
         {   
             _name = "FileCache_" + _nameCounter;
             _nameCounter++;
             
             DefaultRegion = null;
             DefaultPolicy = new CacheItemPolicy();
-            AccessTimeout = new TimeSpan();
             MaxCacheSize = long.MaxValue;
 
             // set default values if not already set
@@ -214,6 +255,14 @@ namespace System.Runtime.Caching
                 // update the cache size, so no need to do it twice.
                 UpdateCacheSizeAsync();
             }
+
+            //set up cache manager
+            CacheManager = FileCacheManagerFactory.Create(manager);
+            CacheManager.CacheDir = CacheDir;
+            CacheManager.CacheSubFolder = _cacheSubFolder;
+            CacheManager.PolicySubFolder = _policySubFolder;
+            CacheManager.Binder = _binder;
+            CacheManager.AccessTimeout = new TimeSpan();
 
             MaxCacheSizeReached += FileCache_MaxCacheSizeReached;
         }
@@ -249,7 +298,7 @@ namespace System.Runtime.Caching
             try
             {
                 // if the file can't be found, or is corrupt this will throw an exception
-                DateTime? lastClean = ReadSysFile(LastCleanedDateFile) as DateTime?;
+                DateTime? lastClean = CacheManager.ReadSysFile(LastCleanedDateFile) as DateTime?;
 
                 //AC: rewrote to be safer in null cases
                 if (lastClean == null)
@@ -346,8 +395,8 @@ namespace System.Runtime.Caching
                     {
                         try
                         {
-                            string cachePath = GetCachePath(key, regionName);
-                            string policyPath = GetPolicyPath(key, regionName);
+                            string cachePath = CacheManager.GetCachePath(key, regionName);
+                            string policyPath = CacheManager.GetPolicyPath(key, regionName);
                             CacheItemReference ci = new CacheItemReference(key, cachePath, policyPath);
                             Remove(key, regionName); // CT note: Remove will update CurrentCacheSize
                             removed += ci.Length;
@@ -358,7 +407,7 @@ namespace System.Runtime.Caching
                 }
 
                 // mark that we've cleaned the cache
-                WriteSysFile(LastCleanedDateFile, DateTime.Now);
+                CacheManager.WriteSysFile(LastCleanedDateFile, DateTime.Now);
 
                 // unlock
                 cLock.Close();
@@ -389,8 +438,8 @@ namespace System.Runtime.Caching
                 try
                 {
                     //build item reference
-                    string cachePath = GetCachePath(key, regionName);
-                    string policyPath = GetPolicyPath(key, regionName);
+                    string cachePath = CacheManager.GetCachePath(key, regionName);
+                    string policyPath = CacheManager.GetPolicyPath(key, regionName);
                     CacheItemReference ci = new CacheItemReference(key, cachePath, policyPath);
                     cacheReferences.Enqueue(ci);
                 }
@@ -434,8 +483,8 @@ namespace System.Runtime.Caching
             long size = 0;
 
             //AC note: First parameter is unused, so just pass in garbage ("DummyValue")
-            string policyPath = Path.GetDirectoryName(GetPolicyPath("DummyValue", regionName));
-            string cachePath = Path.GetDirectoryName(GetCachePath("DummyValue", regionName));
+            string policyPath = Path.GetDirectoryName(CacheManager.GetPolicyPath("DummyValue", regionName));
+            string cachePath = Path.GetDirectoryName(CacheManager.GetCachePath("DummyValue", regionName));
             size += CacheSizeHelper(new DirectoryInfo(policyPath));
             size += CacheSizeHelper(new DirectoryInfo(cachePath));
             return size;
@@ -488,8 +537,8 @@ namespace System.Runtime.Caching
                     return;
 
                 //AC note: First parameter is unused, so just pass in garbage ("DummyValue")
-                string policyPath = Path.GetDirectoryName(GetPolicyPath("DummyValue", regionName));
-                string cachePath = Path.GetDirectoryName(GetCachePath("DummyValue", regionName));
+                string policyPath = Path.GetDirectoryName(CacheManager.GetPolicyPath("DummyValue", regionName));
+                string cachePath = Path.GetDirectoryName(CacheManager.GetCachePath("DummyValue", regionName));
                 FlushHelper(new DirectoryInfo(policyPath), minDate);
                 FlushHelper(new DirectoryInfo(cachePath), minDate);
 
@@ -536,7 +585,7 @@ namespace System.Runtime.Caching
         public CacheItemPolicy GetPolicy(string key, string regionName = null)
         {
             CacheItemPolicy policy = new CacheItemPolicy();
-            FileCachePayload payload = ReadFile(key, regionName) as FileCachePayload;
+            FileCachePayload payload = CacheManager.ReadFile(key, regionName) as FileCachePayload;
             if (payload != null)
             {
                 try
@@ -551,313 +600,24 @@ namespace System.Runtime.Caching
             return policy;
         }
 
-        /// <summary>
-        /// Returns a list of keys for a given region.  
-        /// </summary>
-        /// <param name="regionName"></param>
-        /// <returns></returns>
         public string[] GetKeys(string regionName = null)
         {
-            string region = "";
-            if (string.IsNullOrEmpty(regionName) == false)
-            {
-                region = regionName;
-            }
-            string directory = Path.Combine(CacheDir, _cacheSubFolder, region);
-            List<string> keys = new List<string>();
-            if (Directory.Exists(directory))
-            {
-                foreach (string file in Directory.GetFiles(directory))
-                {
-                    keys.Add(Path.GetFileNameWithoutExtension(file));
-                }
-            }
-            return keys.ToArray();
+            return CacheManager.GetKeys(regionName);
         }
 
         #endregion
 
-        #region helper methods
+        #region private helpers
 
-        /// <summary>
-        /// This function servies to centralize file stream access within this class.
-        /// </summary>
-        /// <param name="path"></param>
-        /// <param name="mode"></param>
-        /// <param name="access"></param>
-        /// <returns></returns>
-        private FileStream GetStream(string path, FileMode mode, FileAccess access, bool lockfile = false)
+        private void WriteHelper(string key, FileCachePayload payload, string regionName)
         {
-            FileStream stream = null;
-            TimeSpan interval = new TimeSpan(0, 0, 0, 0, 50);
-            TimeSpan totalTime = new TimeSpan();
-            while (stream == null)
-            {
-                try
-                {
-                    if (lockfile)
-                    {
-                        stream = File.Open(path, mode, access, FileShare.None);
-                    }
-                    else
-                    {
-                        stream = File.Open(path, mode, access, FileShare.ReadWrite);
-                    }
-                }
-                catch (IOException ex)
-                {
-                    Thread.Sleep(interval);
-                    totalTime += interval;
-
-                    //if we've waited too long, throw the original exception.
-                    if (AccessTimeout.Ticks != 0)
-                    {
-                        if (totalTime > AccessTimeout)
-                        {
-                            throw ex;
-                        }
-                    }
-                }
-            }
-            return stream;
-        }
-
-        /// <summary>
-        /// This function serves to centralize file reads within this class.
-        /// </summary>
-        /// <param name="path"></param>
-        /// <param name="objectBinder"></param>
-        /// <returns></returns>
-        private FileCachePayload ReadFile(string key, string regionName = null, SerializationBinder objectBinder = null)
-        {
-            object data = null;
-            SerializableCacheItemPolicy policy = new SerializableCacheItemPolicy();
-            string cachePath = GetCachePath(key, regionName);
-            string policyPath = GetPolicyPath(key, regionName);
-            FileCachePayload payload = new FileCachePayload(null);
-
-            if (File.Exists(cachePath))
-            {
-                using (FileStream stream = GetStream(cachePath, FileMode.Open, FileAccess.Read))
-                {
-                    BinaryFormatter formatter = new BinaryFormatter();
-
-                    //AC: From http://spazzarama.com//2009/06/25/binary-deserialize-unable-to-find-assembly/
-                    //    Needed to deserialize custom objects
-                    if (objectBinder != null)
-                    {
-                        //take supplied binder over default binder
-                        formatter.Binder = objectBinder;
-                    }
-                    else if (_binder != null)
-                    {
-                        formatter.Binder = _binder;
-                    }
-                    try
-                    {
-                        data = formatter.Deserialize(stream);
-                    }
-                    catch (SerializationException)
-                    {
-                        data = null;
-                    }
-                    finally
-                    {
-                        stream.Close();
-                    }
-                }
-            }
-            if (File.Exists(policyPath))
-            {
-                using (FileStream stream = GetStream(policyPath, FileMode.Open, FileAccess.Read))
-                {
-                    BinaryFormatter formatter = new BinaryFormatter();
-                    formatter.Binder = new LocalCacheBinder();
-                    try
-                    {
-                        policy = formatter.Deserialize(stream) as SerializableCacheItemPolicy;
-                    }
-                    catch (SerializationException)
-                    {
-                        policy = new SerializableCacheItemPolicy();
-                    }
-                    finally
-                    {
-                        stream.Close();
-                    }
-                }
-            }
-            payload.Payload = data;
-            payload.Policy = policy;
-            return payload;
-        }
-
-        /// <summary>
-        /// This function serves to centralize file writes within this class
-        /// </summary>
-        private void WriteFile(string key, FileCachePayload data, string regionName = null)
-        {
-            string cachedPolicy = GetPolicyPath(key, regionName);
-            string cachedItemPath = GetCachePath(key, regionName);
-
-            //remove current item / policy from cache size calculations
-            if(File.Exists(cachedItemPath))
-            {
-                CurrentCacheSize -= new FileInfo(cachedItemPath).Length;
-            }
-            if(File.Exists(cachedPolicy))
-            {
-                CurrentCacheSize -= new FileInfo(cachedPolicy).Length;
-            }
-
-            //write the object payload (lock the file so we can write to it and force others to wait for us to finish)
-            using (FileStream stream = GetStream(cachedItemPath, FileMode.Create, FileAccess.Write))
-            {
-                BinaryFormatter formatter = new BinaryFormatter();
-                formatter.Serialize(stream, data.Payload);
-
-                //adjust cache size (while we have the file to ourselves)
-                CurrentCacheSize += new FileInfo(cachedItemPath).Length;
-
-                stream.Close();
-            }
-            
-            //write the cache policy
-            using (FileStream stream = GetStream(cachedPolicy, FileMode.Create, FileAccess.Write))
-            {
-                BinaryFormatter formatter = new BinaryFormatter();
-                formatter.Serialize(stream, data.Policy);
-                
-                // adjust cache size
-                CurrentCacheSize += new FileInfo(cachedPolicy).Length;
-
-                stream.Close();
-            }
-
-            // try to update the last access time
-            try
-            {
-                File.SetLastAccessTime(cachedItemPath, DateTime.Now);
-            }
-            catch (IOException)
-            {
-            }
+            CurrentCacheSize += CacheManager.WriteFile(key, payload, regionName);
 
             //check to see if limit was reached
-            if(CurrentCacheSize > MaxCacheSize)
+            if (CurrentCacheSize > MaxCacheSize)
             {
                 MaxCacheSizeReached(this, new FileCacheEventArgs(CurrentCacheSize, MaxCacheSize));
             }
-        }
-
-        /// <summary>
-        /// Reads data in from a system file. System files are not part of the
-        /// cache itself, but serve as a way for the cache to store data it 
-        /// needs to operate.
-        /// </summary>
-        /// <param name="filename">The name of the sysfile (without directory)</param>
-        /// <returns>The data from the file</returns>
-        private object ReadSysFile(string filename)
-        {
-            // sys files go in the root directory
-            string path = Path.Combine(CacheDir, filename);
-            object data = null;
-
-            if (File.Exists(path))
-            {
-                for (int i = 5; i > 0; i--) // try 5 times to read the file, if we can't, give up
-                {
-                    try
-                    {
-                        using (FileStream stream = GetStream(path, FileMode.Open, FileAccess.Read))
-                        {
-                            BinaryFormatter formatter = new BinaryFormatter();
-                            try
-                            {
-                                data = formatter.Deserialize(stream);
-                            }
-                            catch (Exception)
-                            {
-                                data = null;
-                            }
-                            finally
-                            {
-                                stream.Close();
-                            }
-                        }
-                        break;
-                    }
-                    catch (IOException)
-                    {
-                        // we timed out... so try again
-                    }
-                }
-            }
-
-            return data;
-        }
-
-        /// <summary>
-        /// Writes data to a system file that is not part of the cache itself,
-        /// but is used to help it function.
-        /// </summary>
-        /// <param name="filename">The name of the sysfile (without directory)</param>
-        /// <param name="data">The data to write to the file</param>
-        private void WriteSysFile(string filename, object data)
-        {
-            // sys files go in the root directory
-            string path = Path.Combine(CacheDir, filename);
-
-            // write the data to the file
-            using (FileStream stream = GetStream(path, FileMode.Create, FileAccess.Write))
-            {
-                BinaryFormatter formatter = new BinaryFormatter();
-                formatter.Serialize(stream, data);
-                stream.Close();
-            }
-        }
-
-        /// <summary>
-        /// Builds a string that will place the specified file name within the appropriate 
-        /// cache and workspace folder.
-        /// </summary>
-        /// <param name="FileName"></param>
-        /// <param name="regionName"></param>
-        /// <returns></returns>
-        private string GetCachePath(string FileName, string regionName = null)
-        {
-            if (regionName == null)
-            {
-                regionName = "";
-            }
-            string directory = Path.Combine(CacheDir, _cacheSubFolder, regionName);
-            string filePath = Path.Combine(directory, Path.GetFileNameWithoutExtension(FileName) + ".dat");
-            if (!Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-            return filePath;
-        }
-
-        /// <summary>
-        /// Builds a string that will get the path to the supplied file's policy file
-        /// </summary>
-        /// <param name="FileName"></param>
-        /// <param name="regionName"></param>
-        /// <returns></returns>
-        private string GetPolicyPath(string FileName, string regionName = null)
-        {
-            if (regionName == null)
-            {
-                regionName = "";
-            }
-            string directory = Path.Combine(CacheDir, _policySubFolder, regionName);
-            string filePath = Path.Combine(directory, Path.GetFileNameWithoutExtension(FileName) + ".policy");
-            if (!Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-            return filePath;
         }
 
         #endregion
@@ -866,7 +626,7 @@ namespace System.Runtime.Caching
 
         public override object AddOrGetExisting(string key, object value, CacheItemPolicy policy, string regionName = null)
         {
-            string path = GetCachePath(key, regionName);
+            string path = CacheManager.GetCachePath(key, regionName);
             object oldData = null;
 
             //pull old value if it exists
@@ -883,7 +643,7 @@ namespace System.Runtime.Caching
             }
             SerializableCacheItemPolicy cachePolicy = new SerializableCacheItemPolicy(policy);
             FileCachePayload newPayload = new FileCachePayload(value, cachePolicy);
-            WriteFile(key, newPayload, regionName);
+            WriteHelper(key, newPayload, regionName);
 
             //As documented in the spec (http://msdn.microsoft.com/en-us/library/dd780602.aspx), return the old
             //cached value or null
@@ -914,7 +674,7 @@ namespace System.Runtime.Caching
 
         public override bool Contains(string key, string regionName = null)
         {
-            string path = GetCachePath(key, regionName);
+            string path = CacheManager.GetCachePath(key, regionName);
             return File.Exists(path);
         }
 
@@ -939,8 +699,8 @@ namespace System.Runtime.Caching
         
         public override object Get(string key, string regionName = null)
         {
-            FileCachePayload payload = ReadFile(key, regionName) as FileCachePayload;
-            string cachedItemPath = GetCachePath(key, regionName);
+            FileCachePayload payload = CacheManager.ReadFile(key, regionName) as FileCachePayload;
+            string cachedItemPath = CacheManager.GetCachePath(key, regionName);
 
             //null payload?
             if (payload != null)
@@ -968,7 +728,7 @@ namespace System.Runtime.Caching
                     if (payload.Policy.SlidingExpiration > new TimeSpan())
                     {
                         payload.Policy.AbsoluteExpiration = DateTime.Now.Add(payload.Policy.SlidingExpiration);
-                        WriteFile(cachedItemPath, payload, regionName);
+                        WriteHelper(cachedItemPath, payload, regionName);
                     }
 
                     //update the file's access time
@@ -1021,6 +781,8 @@ namespace System.Runtime.Caching
             {
                 region = regionName;
             }
+
+            //AC: This seems inefficient.  Wouldn't it be better to do this using a cursor?
             List<KeyValuePair<string, object>> enumerator = new List<KeyValuePair<string, object>>();
 
             string directory = Path.Combine(CacheDir, _cacheSubFolder, region);
@@ -1070,14 +832,14 @@ namespace System.Runtime.Caching
                     // CT note: calling Get from remove leads to an infinite loop and stack overflow,
                     // so I replaced it with a simple ReadFile call. None of the code here actually
                     // uses this object returned, but just in case someone else's outside code does.
-                    FileCachePayload fcp = ReadFile(key, regionName);
+                    FileCachePayload fcp = CacheManager.ReadFile(key, regionName);
                     valueToDelete = fcp.Payload;
-                    string path = GetCachePath(key, regionName);
+                    string path = CacheManager.GetCachePath(key, regionName);
                     CurrentCacheSize -= new FileInfo(path).Length;
                     File.Delete(path);
 
                     //remove policy file
-                    string cachedPolicy = GetPolicyPath(key, regionName);
+                    string cachedPolicy = CacheManager.GetPolicyPath(key, regionName);
                     CurrentCacheSize -= new FileInfo(cachedPolicy).Length;
                     File.Delete(cachedPolicy);
                 }

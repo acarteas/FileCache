@@ -11,6 +11,7 @@
     <UpdateVersionProperties>true</UpdateVersionProperties>
     <Version>0.0.0</Version>
     <Company>Adam Carter</Company>
+    <RootNamespace>System.Runtime.Caching</RootNamespace>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net40|AnyCPU'">
     <GenerateSerializationAssemblies>Auto</GenerateSerializationAssemblies>
