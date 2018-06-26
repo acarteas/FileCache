@@ -40,5 +40,10 @@ namespace System.Runtime.Caching
         {
             SlidingExpiration = new TimeSpan();
         }
+
+        /// <summary>
+        /// The cache key that this particular policy refers to
+        /// </summary>
+        public string Key { get; set; }
     }
 }

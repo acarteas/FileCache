@@ -125,6 +125,26 @@ namespace System.Runtime.Caching
         #region constructors
 
         /// <summary>
+        /// Creates a default instance of the file cache using the supplied file cache manager.
+        /// </summary>
+        /// <param name="manager"></param>
+        public FileCache(FileCacheManagers manager)
+        {
+            Init(false, new TimeSpan(), true, true, manager);
+        }
+
+        /// <summary>
+        /// Creates a new instance of the file cache using the supplied cache directory and cache manager.
+        /// </summary>
+        /// <param name="cacheRoot"></param>
+        /// <param name="manager"></param>
+        public FileCache(string cacheRoot, FileCacheManagers manager)
+        {
+            CacheDir = cacheRoot;
+            Init(false, new TimeSpan(), false, true, manager);
+        }
+
+        /// <summary>
         /// Creates a default instance of the file cache.  Don't use if you plan to serialize custom objects
         /// </summary>
         /// <param name="calculateCacheSize">If true, will calcualte the cache's current size upon new object creation.
@@ -533,49 +553,30 @@ namespace System.Runtime.Caching
             // prevent other threads from altering stuff while we delete junk
             using (FileStream cLock = GetCleaningLock())
             {
+                //AC: Not added by me.  What does this do?
                 if (cLock == null)
+                {
                     return;
+                }
 
-                //AC note: First parameter is unused, so just pass in garbage ("DummyValue")
-                string policyPath = Path.GetDirectoryName(CacheManager.GetPolicyPath("DummyValue", regionName));
-                string cachePath = Path.GetDirectoryName(CacheManager.GetCachePath("DummyValue", regionName));
-                FlushHelper(new DirectoryInfo(policyPath), minDate);
-                FlushHelper(new DirectoryInfo(cachePath), minDate);
+                string[] keys = CacheManager.GetKeys();
+                foreach(string key in keys)
+                {
+                    string policyPath = CacheManager.GetPolicyPath(key, regionName);
+                    string cachePath = CacheManager.GetCachePath(key, regionName);
 
-                // Update the Cache size
-                CurrentCacheSize = GetCacheSize();
+                    //if either policy or cache are stale, delete both
+                    if(File.GetLastAccessTime(policyPath) < minDate || File.GetLastAccessTime(cachePath) < minDate)
+                    {
+                        CurrentCacheSize -= CacheManager.DeleteFile(key, regionName);
+                    }
+                }
 
                 // unlock
                 cLock.Close();
             }
         }
-
-        /// <summary>
-        /// Helper method for public flush
-        /// </summary>
-        /// <param name="root"></param>
-        /// <param name="minDate"></param>
-        private void FlushHelper(DirectoryInfo root, DateTime minDate)
-        {
-            // check files.
-            FileInfo[] fis = root.GetFiles();
-            foreach (FileInfo fi in fis)
-            {
-                //is the file stale?
-                if(minDate > File.GetLastAccessTime(fi.FullName))
-                {
-                    File.Delete(fi.FullName);
-                }
-            }
-
-            // check subdirectories
-            DirectoryInfo[] dis = root.GetDirectories();
-            foreach (DirectoryInfo di in dis)
-            {
-                FlushHelper(di, minDate);
-            }
-        }
-
+        
         /// <summary>
         /// Returns the policy attached to a given cache item.  
         /// </summary>
@@ -822,26 +823,22 @@ namespace System.Runtime.Caching
         public override object Remove(string key, string regionName = null)
         {
             object valueToDelete = null;
-            if (Contains(key, regionName))
+
+            
+            if (Contains(key, regionName) == true)
             {
+                //Holds the value that we will return to the user
+                FileCachePayload fcp = CacheManager.ReadFile(key, regionName);
+
                 // Because of the possibility of multiple threads accessing this, it's possible that
                 // while we're trying to remove something, another thread has already removed it.
                 try
                 {
-                    //remove cache entry
-                    // CT note: calling Get from remove leads to an infinite loop and stack overflow,
-                    // so I replaced it with a simple ReadFile call. None of the code here actually
-                    // uses this object returned, but just in case someone else's outside code does.
-                    FileCachePayload fcp = CacheManager.ReadFile(key, regionName);
+                    //The FC Manager handles the delete as the method of deletion varies by caching mechanism.
+                    //The FC manager may throw an exception when trying to delete, which is why we assign valueToDelete
+                    //only after a successful call.  
+                    CurrentCacheSize -= CacheManager.DeleteFile(key, regionName);
                     valueToDelete = fcp.Payload;
-                    string path = CacheManager.GetCachePath(key, regionName);
-                    CurrentCacheSize -= new FileInfo(path).Length;
-                    File.Delete(path);
-
-                    //remove policy file
-                    string cachedPolicy = CacheManager.GetPolicyPath(key, regionName);
-                    CurrentCacheSize -= new FileInfo(cachedPolicy).Length;
-                    File.Delete(cachedPolicy);
                 }
                 catch (IOException)
                 {
