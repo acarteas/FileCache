@@ -97,6 +97,9 @@ namespace System.Runtime.Caching
             string cachedItemPath = GetCachePath(key, regionName);
             long cacheSizeDelta = 0;
 
+            //ensure that the cache policy contains the correct key
+            data.Policy.Key = key;
+
             //remove current item / policy from cache size calculations
             if (File.Exists(cachedItemPath))
             {
@@ -306,7 +309,7 @@ namespace System.Runtime.Caching
                 //Owning FC might be interested in this exception.  
                 throw ex;
             }
-            return bytesFreed;
+            return Math.Abs(bytesFreed);
         }
 
         protected class LocalCacheBinder : System.Runtime.Serialization.SerializationBinder
