@@ -39,10 +39,10 @@ namespace FC.UnitTests
 
             //add an item and have it expire yesterday
             policy.AbsoluteExpiration = (DateTimeOffset)DateTime.Now.AddDays(-1);
-            _cache.Set("test", "test", policy);
+            _cache.Set("test.1", "test", policy);
 
             //then try to access the item
-            object result = _cache.Get("test");
+            object result = _cache.Get("test.1");
             result.Should().BeNull();
         }
 
@@ -71,9 +71,9 @@ namespace FC.UnitTests
             _cache = new FileCache();
             CacheItemPolicy policy = new CacheItemPolicy();
             policy.SlidingExpiration = new TimeSpan(1, 0, 0, 0, 0);
-            _cache.Set("test", "test", policy);
+            _cache.Set("test.1", "test", policy);
 
-            CacheItemPolicy returnPolicy = _cache.GetPolicy("test");
+            CacheItemPolicy returnPolicy = _cache.GetPolicy("test.1");
             policy.SlidingExpiration.Should().Be(returnPolicy.SlidingExpiration);
         }
 
@@ -85,25 +85,25 @@ namespace FC.UnitTests
 
             //add an item and have it expire 500 ms from now
             policy.SlidingExpiration = new TimeSpan(0, 0, 0, 0, 500);
-            _cache.Set("test", "test", policy);
+            _cache.Set("test.1", "test", policy);
 
             //sleep for 200
             Thread.Sleep(200);
 
             //then try to access the item
-            object result = _cache.Get("test");
+            object result = _cache.Get("test.1");
             result.Should().Be("test");
 
             //sleep for another 200
             Thread.Sleep(200);
 
             //then try to access the item
-            result = _cache.Get("test");
+            result = _cache.Get("test.1");
             result.Should().Be("test");
 
             //then sleep for more than 500 ms.  Should be gone
             Thread.Sleep(600);
-            result = _cache.Get("test");
+            result = _cache.Get("test.1");
             result.Should().BeNull();
         }
 
@@ -122,7 +122,7 @@ namespace FC.UnitTests
                 }
             };
 
-            CacheItem item = new CacheItem("foo")
+            CacheItem item = new CacheItem("foo.1")
             {
                 Value = customBefore,
                 RegionName = "foobar"
@@ -132,10 +132,10 @@ namespace FC.UnitTests
             _cache.Set(item, new CacheItemPolicy());
 
             //now get it back
-            CacheItem fromCache = _cache.GetCacheItem("foo", "foobar");
+            CacheItem fromCache = _cache.GetCacheItem("foo.1", "foobar");
 
             //pulling twice increases code coverage
-            fromCache = _cache.GetCacheItem("foo", "foobar");
+            fromCache = _cache.GetCacheItem("foo.1", "foobar");
 
             var customAfter = fromCache.Value as CustomObjB;
 
@@ -147,13 +147,13 @@ namespace FC.UnitTests
         {
             _cache = new FileCache("CacheSizeTest");
 
-            _cache["foo"] = "bar";
-            _cache["foo"] = "foobar";
+            _cache["foo.1"] = "bar";
+            _cache["foo.1"] = "foobar";
 
             long cacheSize = _cache.GetCacheSize();
             cacheSize.Should().NotBe(0);
 
-            _cache.Remove("foo");
+            _cache.Remove("foo.1");
             cacheSize = _cache.CurrentCacheSize;
             cacheSize.Should().Be(0);
         }
