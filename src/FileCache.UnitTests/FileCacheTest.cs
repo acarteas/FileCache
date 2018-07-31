@@ -28,7 +28,7 @@ namespace FC.UnitTests
         [TestCleanup]
         public void Cleanup()
         {
-            _cache?.Flush(); // Clears the cache after every Test
+            _cache?.Clear(); // Clears the cache after every Test
         }
 
         [TestMethod]

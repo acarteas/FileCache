@@ -33,6 +33,10 @@ namespace System.Runtime.Caching
         private long _currentCacheSize = 0;
         public string CacheDir { get; protected set; }
 
+        /// <summary>
+        /// Allows for the setting of the default cache manager so that it doesn't have to be
+        /// specified on every instance creation.
+        /// </summary>
         public static FileCacheManagers DefaultCacheManager {
             get
             {
@@ -268,13 +272,19 @@ namespace System.Runtime.Caching
 
             // set default values if not already set
             if (setCacheDirToDefault)
+            {
                 CacheDir = DefaultCachePath;
+            }
             if (setBinderToDefault)
+            {
                 _binder = new FileCacheBinder();
+            }
 
             // if it doesn't exist, we need to make it
             if (!Directory.Exists(CacheDir))
+            {
                 Directory.CreateDirectory(CacheDir);
+            }
             
             // only set the clean interval if the user supplied it
             if (cleanInterval > new TimeSpan())
@@ -368,7 +378,9 @@ namespace System.Runtime.Caching
             using (FileStream cLock = GetCleaningLock())
             {
                 if (cLock == null)
+                {
                     return -1;
+                }
 
                 // if we're shrinking the whole cache, we can use the stored
                 // size if it's available. If it's not available we calculate it and store
@@ -553,6 +565,42 @@ namespace System.Runtime.Caching
         }
 
         /// <summary>
+        /// Clears all FileCache-related items from the disk.  Throws an exception if the cache can't be
+        /// deleted.
+        /// </summary>
+        public void Clear()
+        {
+            //Before we can delete the entire file tree, we have to wait for any latent writes / reads to finish
+            //To do this, we wait for access to our cacheLock file.  When we get access, we have to immediately
+            //release it (can't delete a file that is open!), which somewhat muddies our condition of needing
+            //exclusive access to the FileCache.  However, the time between closing and making the call to
+            //delete is so small that we probably won't run into an exception most of the time.
+            FileStream cacheLock = null;
+            TimeSpan totalTime = new TimeSpan(0);
+            TimeSpan interval = new TimeSpan(0, 0, 0, 0, 50);
+            TimeSpan timeToWait = AccessTimeout;
+            if (AccessTimeout == new TimeSpan())
+            {
+                //if access timeout is not set, make really large wait time
+                timeToWait = new TimeSpan(5, 0, 0);
+            }
+            while (cacheLock == null && timeToWait > totalTime)
+            {
+                cacheLock = GetCleaningLock();
+                Thread.Sleep(interval);
+                totalTime += interval;
+            }
+            if(cacheLock == null)
+            {
+                throw new TimeoutException("FileCache AccessTimeout reached when attempting to clear cache.");
+            }
+            cacheLock.Close();
+
+            //now that we've waited for everything to stop, we can delete the cache directory.
+            Directory.Delete(CacheDir, true);
+        }
+
+        /// <summary>
         /// Flushes the file cache using DateTime.Now as the minimum date
         /// </summary>
         /// <param name="regionName"></param>
@@ -571,7 +619,6 @@ namespace System.Runtime.Caching
             // prevent other threads from altering stuff while we delete junk
             using (FileStream cLock = GetCleaningLock())
             {
-                //AC: Not added by me.  What does this do?
                 if (cLock == null)
                 {
                     return;

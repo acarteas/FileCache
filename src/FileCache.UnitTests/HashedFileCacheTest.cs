@@ -33,7 +33,7 @@ namespace FC.UnitTests
         [TestCleanup]
         public void Cleanup()
         {
-            _cache?.Flush(); // Clears the cache after every Test
+            _cache?.Clear(); // Clears the cache after every Test
         }
 
         [TestMethod]
@@ -213,10 +213,6 @@ namespace FC.UnitTests
             for (int i = 0; i < 100; i++)
             {
                 _cache["foo" + i] = "bar";
-
-                // test to make sure it doesn't crash if one of the files is missing
-                if (i == 10)
-                    File.Delete(_cache.CacheDir + "/cache/foo9.dat");
 
                 // test to make sure it leaves items that have been recently accessed.
                 if (i % 5 == 0 && i != 0)
