@@ -585,8 +585,9 @@ namespace System.Runtime.Caching
         /// <param name="path"></param>
         /// <param name="mode"></param>
         /// <param name="access"></param>
+        /// <param name="share"></param>
         /// <returns></returns>
-        private FileStream GetStream(string path, FileMode mode, FileAccess access, bool lockfile = false)
+        private FileStream GetStream(string path, FileMode mode, FileAccess access, FileShare share)
         {
             FileStream stream = null;
             TimeSpan interval = new TimeSpan(0, 0, 0, 0, 50);
@@ -595,14 +596,7 @@ namespace System.Runtime.Caching
             {
                 try
                 {
-                    if (lockfile)
-                    {
-                        stream = File.Open(path, mode, access, FileShare.None);
-                    }
-                    else
-                    {
-                        stream = File.Open(path, mode, access, FileShare.ReadWrite);
-                    }
+                    stream = File.Open(path, mode, access, share);
                 }
                 catch (IOException ex)
                 {
@@ -638,7 +632,7 @@ namespace System.Runtime.Caching
 
             if (File.Exists(cachePath))
             {
-                using (FileStream stream = GetStream(cachePath, FileMode.Open, FileAccess.Read))
+                using (FileStream stream = GetStream(cachePath, FileMode.Open, FileAccess.Read, FileShare.Read))
                 {
                     BinaryFormatter formatter = new BinaryFormatter();
 
@@ -669,7 +663,7 @@ namespace System.Runtime.Caching
             }
             if (File.Exists(policyPath))
             {
-                using (FileStream stream = GetStream(policyPath, FileMode.Open, FileAccess.Read))
+                using (FileStream stream = GetStream(policyPath, FileMode.Open, FileAccess.Read, FileShare.Read))
                 {
                     BinaryFormatter formatter = new BinaryFormatter();
                     formatter.Binder = new LocalCacheBinder();
@@ -711,7 +705,7 @@ namespace System.Runtime.Caching
             }
 
             //write the object payload (lock the file so we can write to it and force others to wait for us to finish)
-            using (FileStream stream = GetStream(cachedItemPath, FileMode.Create, FileAccess.Write))
+            using (FileStream stream = GetStream(cachedItemPath, FileMode.Create, FileAccess.Write, FileShare.None))
             {
                 BinaryFormatter formatter = new BinaryFormatter();
                 formatter.Serialize(stream, data.Payload);
@@ -723,7 +717,7 @@ namespace System.Runtime.Caching
             }
             
             //write the cache policy
-            using (FileStream stream = GetStream(cachedPolicy, FileMode.Create, FileAccess.Write))
+            using (FileStream stream = GetStream(cachedPolicy, FileMode.Create, FileAccess.Write, FileShare.None))
             {
                 BinaryFormatter formatter = new BinaryFormatter();
                 formatter.Serialize(stream, data.Policy);
@@ -769,7 +763,7 @@ namespace System.Runtime.Caching
                 {
                     try
                     {
-                        using (FileStream stream = GetStream(path, FileMode.Open, FileAccess.Read))
+                        using (FileStream stream = GetStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
                         {
                             BinaryFormatter formatter = new BinaryFormatter();
                             try
@@ -809,7 +803,7 @@ namespace System.Runtime.Caching
             string path = Path.Combine(CacheDir, filename);
 
             // write the data to the file
-            using (FileStream stream = GetStream(path, FileMode.Create, FileAccess.Write))
+            using (FileStream stream = GetStream(path, FileMode.Create, FileAccess.Write, FileShare.Write))
             {
                 BinaryFormatter formatter = new BinaryFormatter();
                 formatter.Serialize(stream, data);
