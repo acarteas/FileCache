@@ -970,9 +970,7 @@ namespace System.Runtime.Caching
                         payload.Policy.AbsoluteExpiration = DateTime.Now.Add(payload.Policy.SlidingExpiration);
                         WriteFile(cachedItemPath, payload, regionName);
                     }
-
-                    //update the file's access time
-                    File.SetLastAccessTime(cachedItemPath, DateTime.Now);
+                    
                 }
             }
             else
