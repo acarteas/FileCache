@@ -728,15 +728,6 @@ namespace System.Runtime.Caching
                 stream.Close();
             }
 
-            // try to update the last access time
-            try
-            {
-                File.SetLastAccessTime(cachedItemPath, DateTime.Now);
-            }
-            catch (IOException)
-            {
-            }
-
             //check to see if limit was reached
             if(CurrentCacheSize > MaxCacheSize)
             {
