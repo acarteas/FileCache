@@ -497,13 +497,13 @@ namespace System.Runtime.Caching
             long size = 0;
 
             // Add file sizes.
-            FileInfo[] fis = root.GetFiles();
+            var fis = root.EnumerateFiles();
             foreach (FileInfo fi in fis)
             {
                 size += fi.Length;
             }
             // Add subdirectory sizes.
-            DirectoryInfo[] dis = root.GetDirectories();
+            var dis = root.EnumerateDirectories();
             foreach (DirectoryInfo di in dis)
             {
                 size += CacheSizeHelper(di);
@@ -555,8 +555,7 @@ namespace System.Runtime.Caching
         private void FlushHelper(DirectoryInfo root, DateTime minDate)
         {
             // check files.
-            FileInfo[] fis = root.GetFiles();
-            foreach (FileInfo fi in fis)
+            foreach (FileInfo fi in root.EnumerateFiles())
             {
                 //is the file stale?
                 if(minDate > File.GetLastAccessTime(fi.FullName))
@@ -566,8 +565,7 @@ namespace System.Runtime.Caching
             }
 
             // check subdirectories
-            DirectoryInfo[] dis = root.GetDirectories();
-            foreach (DirectoryInfo di in dis)
+            foreach (DirectoryInfo di in root.EnumerateDirectories())
             {
                 FlushHelper(di, minDate);
             }
@@ -602,7 +600,7 @@ namespace System.Runtime.Caching
         /// </summary>
         /// <param name="regionName"></param>
         /// <returns></returns>
-        public string[] GetKeys(string regionName = null)
+        public IEnumerable<string> GetKeys(string regionName = null)
         {
             string region = "";
             if (string.IsNullOrEmpty(regionName) == false)
@@ -610,15 +608,13 @@ namespace System.Runtime.Caching
                 region = regionName;
             }
             string directory = Path.Combine(CacheDir, _cacheSubFolder, region);
-            List<string> keys = new List<string>();
             if (Directory.Exists(directory))
             {
-                foreach (string file in Directory.GetFiles(directory))
+                foreach (string file in Directory.EnumerateFiles(directory))
                 {
-                    keys.Add(Path.GetFileNameWithoutExtension(file));
+                    yield return Path.GetFileNameWithoutExtension(file);
                 }
             }
-            return keys.ToArray();
         }
 
         #endregion
