@@ -30,6 +30,7 @@ namespace System.Runtime.Caching
         // this is a file used to prevent multiple processes from trying to "clean" at the same time
         private const string SemaphoreFile = "cache.sem"; 
         private long _currentCacheSize = 0;
+        private PayloadMode _readMode = PayloadMode.Serializable;
         public string CacheDir { get; protected set; }
 
 
@@ -42,6 +43,51 @@ namespace System.Runtime.Caching
         /// Used to set the default policy when setting cache values via [] calls
         /// </summary>
         public CacheItemPolicy DefaultPolicy { get; set; }
+
+        /// <summary>
+        /// Specified how the cache payload is to be handled.
+        /// </summary>
+        public enum PayloadMode
+        {
+            /// <summary>
+            /// Treat the payload a a serializable object.
+            /// </summary>
+            Serializable,
+            /// <summary>
+            /// Treat the payload as a file name. File content will be copied on add, while get returns the file name.
+            /// </summary>
+            Filename,
+            /// <summary>
+            /// Treat the paylad as raw bytes. A byte[] and readable streams are supported on add.
+            /// </summary>
+            RawBytes
+        }
+
+        /// <summary>
+        /// Specified whether the payload is deserialized or just the file name.
+        /// </summary>
+        public PayloadMode PayloadReadMode {
+            get => _readMode;
+            set {
+                if (value == PayloadMode.RawBytes)
+                {
+                    throw new ArgumentException("The read mode cannot be set to RawBytes. Use the file name please.");
+                }
+                _readMode = value;
+            }
+        }
+
+        /// <summary>
+        /// Specified how the payload is to be handled on add operations.
+        /// </summary>
+        public PayloadMode PayloadWriteMode { get; set; } = PayloadMode.Serializable;
+
+        /// <summary>
+        /// The amount of time before expiry that a filename will be used as a payoad. I.e.
+        /// the amount of time the cache's user can safely use the file delivered as a payload.
+        /// Default 10 minutes.
+        /// </summary>
+        public TimeSpan FilenameAsPayloadSafetyMargin = TimeSpan.FromMinutes(10);
 
         /// <summary>
         /// Used to determine how long the FileCache will wait for a file to become 
@@ -451,13 +497,13 @@ namespace System.Runtime.Caching
             long size = 0;
 
             // Add file sizes.
-            FileInfo[] fis = root.GetFiles();
+            var fis = root.EnumerateFiles();
             foreach (FileInfo fi in fis)
             {
                 size += fi.Length;
             }
             // Add subdirectory sizes.
-            DirectoryInfo[] dis = root.GetDirectories();
+            var dis = root.EnumerateDirectories();
             foreach (DirectoryInfo di in dis)
             {
                 size += CacheSizeHelper(di);
@@ -509,8 +555,7 @@ namespace System.Runtime.Caching
         private void FlushHelper(DirectoryInfo root, DateTime minDate)
         {
             // check files.
-            FileInfo[] fis = root.GetFiles();
-            foreach (FileInfo fi in fis)
+            foreach (FileInfo fi in root.EnumerateFiles())
             {
                 //is the file stale?
                 if(minDate > File.GetLastAccessTime(fi.FullName))
@@ -520,8 +565,7 @@ namespace System.Runtime.Caching
             }
 
             // check subdirectories
-            DirectoryInfo[] dis = root.GetDirectories();
-            foreach (DirectoryInfo di in dis)
+            foreach (DirectoryInfo di in root.EnumerateDirectories())
             {
                 FlushHelper(di, minDate);
             }
@@ -536,7 +580,7 @@ namespace System.Runtime.Caching
         public CacheItemPolicy GetPolicy(string key, string regionName = null)
         {
             CacheItemPolicy policy = new CacheItemPolicy();
-            FileCachePayload payload = ReadFile(key, regionName) as FileCachePayload;
+            FileCachePayload payload = ReadFile(PayloadMode.Filename, key, regionName) as FileCachePayload;
             if (payload != null)
             {
                 try
@@ -556,7 +600,7 @@ namespace System.Runtime.Caching
         /// </summary>
         /// <param name="regionName"></param>
         /// <returns></returns>
-        public string[] GetKeys(string regionName = null)
+        public IEnumerable<string> GetKeys(string regionName = null)
         {
             string region = "";
             if (string.IsNullOrEmpty(regionName) == false)
@@ -564,15 +608,13 @@ namespace System.Runtime.Caching
                 region = regionName;
             }
             string directory = Path.Combine(CacheDir, _cacheSubFolder, region);
-            List<string> keys = new List<string>();
             if (Directory.Exists(directory))
             {
-                foreach (string file in Directory.GetFiles(directory))
+                foreach (string file in Directory.EnumerateFiles(directory))
                 {
-                    keys.Add(Path.GetFileNameWithoutExtension(file));
+                    yield return Path.GetFileNameWithoutExtension(file);
                 }
             }
-            return keys.ToArray();
         }
 
         #endregion
@@ -619,10 +661,11 @@ namespace System.Runtime.Caching
         /// <summary>
         /// This function serves to centralize file reads within this class.
         /// </summary>
-        /// <param name="path"></param>
+        /// <param name="mode">the payload reading mode</param>
+        /// <param name="key"></param>
         /// <param name="objectBinder"></param>
         /// <returns></returns>
-        private FileCachePayload ReadFile(string key, string regionName = null, SerializationBinder objectBinder = null)
+        private FileCachePayload ReadFile(PayloadMode mode, string key, string regionName = null, SerializationBinder objectBinder = null)
         {
             object data = null;
             SerializableCacheItemPolicy policy = new SerializableCacheItemPolicy();
@@ -632,33 +675,18 @@ namespace System.Runtime.Caching
 
             if (File.Exists(cachePath))
             {
-                using (FileStream stream = GetStream(cachePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                switch (mode)
                 {
-                    BinaryFormatter formatter = new BinaryFormatter();
-
-                    //AC: From http://spazzarama.com//2009/06/25/binary-deserialize-unable-to-find-assembly/
-                    //    Needed to deserialize custom objects
-                    if (objectBinder != null)
-                    {
-                        //take supplied binder over default binder
-                        formatter.Binder = objectBinder;
-                    }
-                    else if (_binder != null)
-                    {
-                        formatter.Binder = _binder;
-                    }
-                    try
-                    {
-                        data = formatter.Deserialize(stream);
-                    }
-                    catch (SerializationException)
-                    {
-                        data = null;
-                    }
-                    finally
-                    {
-                        stream.Close();
-                    }
+                    default:
+                    case PayloadMode.Filename:
+                        data = cachePath;
+                        break;
+                    case PayloadMode.Serializable:
+                        data = DeserializePayloadData(objectBinder, cachePath);
+                        break;
+                    case PayloadMode.RawBytes:
+                        data = LoadRawPayloadData(cachePath);
+                        break;
                 }
             }
             if (File.Exists(policyPath))
@@ -675,10 +703,6 @@ namespace System.Runtime.Caching
                     {
                         policy = new SerializableCacheItemPolicy();
                     }
-                    finally
-                    {
-                        stream.Close();
-                    }
                 }
             }
             payload.Payload = data;
@@ -686,36 +710,102 @@ namespace System.Runtime.Caching
             return payload;
         }
 
+        private object LoadRawPayloadData(string cachePath)
+        {
+            throw new NotSupportedException("Reading raw payload is not currently supported.");
+        }
+
+        private object DeserializePayloadData(SerializationBinder objectBinder, string cachePath)
+        {
+            object data;
+            using (FileStream stream = GetStream(cachePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                BinaryFormatter formatter = new BinaryFormatter();
+
+                //AC: From http://spazzarama.com//2009/06/25/binary-deserialize-unable-to-find-assembly/
+                //    Needed to deserialize custom objects
+                if (objectBinder != null)
+                {
+                    //take supplied binder over default binder
+                    formatter.Binder = objectBinder;
+                }
+                else if (_binder != null)
+                {
+                    formatter.Binder = _binder;
+                }
+
+                try
+                {
+                    data = formatter.Deserialize(stream);
+                }
+                catch (SerializationException)
+                {
+                    data = null;
+                }
+            }
+
+            return data;
+        }
+
         /// <summary>
         /// This function serves to centralize file writes within this class
         /// </summary>
-        private void WriteFile(string key, FileCachePayload data, string regionName = null)
+        private void WriteFile(PayloadMode mode, string key, FileCachePayload data, string regionName = null, bool policyUpdateOnly = false)
         {
             string cachedPolicy = GetPolicyPath(key, regionName);
             string cachedItemPath = GetCachePath(key, regionName);
 
-            //remove current item / policy from cache size calculations
-            if(File.Exists(cachedItemPath))
+            
+            if (!policyUpdateOnly)
             {
-                CurrentCacheSize -= new FileInfo(cachedItemPath).Length;
+                long oldBlobSize = 0;
+                if (File.Exists(cachedItemPath))
+                {
+                    oldBlobSize = new FileInfo(cachedItemPath).Length;
+                }
+
+                switch (mode) {
+                case PayloadMode.Serializable:
+					using (FileStream stream = GetStream(cachedItemPath, FileMode.Create, FileAccess.Write, FileShare.None))
+					{
+
+						BinaryFormatter formatter = new BinaryFormatter();
+						formatter.Serialize(stream, data.Payload);
+					}
+					break;
+                case PayloadMode.RawBytes:
+                    using (FileStream stream = GetStream(cachedItemPath, FileMode.Create, FileAccess.Write, FileShare.None))
+					{
+
+						if (data.Payload is byte[])
+						{
+							byte[] dataPayload = (byte[]) data.Payload;
+							stream.Write(dataPayload, 0, dataPayload.Length);
+						}
+						else if (data.Payload is Stream)
+						{
+							Stream dataPayload = (Stream) data.Payload;
+							dataPayload.CopyTo(stream);
+							// no close or the like, we are not the owner
+						}
+					}
+					break;
+
+				case PayloadMode.Filename:
+                    File.Copy((string) data.Payload, cachedItemPath, true);
+                    break;
+                }
+
+                //adjust cache size (while we have the file to ourselves)
+                CurrentCacheSize += new FileInfo(cachedItemPath).Length - oldBlobSize;
             }
-            if(File.Exists(cachedPolicy))
+
+            //remove current policy file from cache size calculations
+            if (File.Exists(cachedPolicy))
             {
                 CurrentCacheSize -= new FileInfo(cachedPolicy).Length;
             }
 
-            //write the object payload (lock the file so we can write to it and force others to wait for us to finish)
-            using (FileStream stream = GetStream(cachedItemPath, FileMode.Create, FileAccess.Write, FileShare.None))
-            {
-                BinaryFormatter formatter = new BinaryFormatter();
-                formatter.Serialize(stream, data.Payload);
-
-                //adjust cache size (while we have the file to ourselves)
-                CurrentCacheSize += new FileInfo(cachedItemPath).Length;
-
-                stream.Close();
-            }
-            
             //write the cache policy
             using (FileStream stream = GetStream(cachedPolicy, FileMode.Create, FileAccess.Write, FileShare.None))
             {
@@ -868,7 +958,7 @@ namespace System.Runtime.Caching
             }
             SerializableCacheItemPolicy cachePolicy = new SerializableCacheItemPolicy(policy);
             FileCachePayload newPayload = new FileCachePayload(value, cachePolicy);
-            WriteFile(key, newPayload, regionName);
+            WriteFile(PayloadWriteMode, key, newPayload, regionName);
 
             //As documented in the spec (http://msdn.microsoft.com/en-us/library/dd780602.aspx), return the old
             //cached value or null
@@ -924,14 +1014,20 @@ namespace System.Runtime.Caching
         
         public override object Get(string key, string regionName = null)
         {
-            FileCachePayload payload = ReadFile(key, regionName) as FileCachePayload;
+            FileCachePayload payload = ReadFile(PayloadReadMode, key, regionName) as FileCachePayload;
             string cachedItemPath = GetCachePath(key, regionName);
+
+            DateTime cutoff = DateTime.Now;
+            if (PayloadReadMode == PayloadMode.Filename)
+            {
+                cutoff += FilenameAsPayloadSafetyMargin;
+            }
 
             //null payload?
             if (payload != null)
             {
                 //did the item expire?
-                if (payload.Policy.AbsoluteExpiration < DateTime.Now)
+                if (payload.Policy.AbsoluteExpiration < cutoff)
                 {
                     //set the payload to null
                     payload.Payload = null;
@@ -953,7 +1049,7 @@ namespace System.Runtime.Caching
                     if (payload.Policy.SlidingExpiration > new TimeSpan())
                     {
                         payload.Policy.AbsoluteExpiration = DateTime.Now.Add(payload.Policy.SlidingExpiration);
-                        WriteFile(cachedItemPath, payload, regionName);
+                        WriteFile(PayloadWriteMode, cachedItemPath, payload, regionName, true);
                     }
                     
                 }
@@ -1053,7 +1149,7 @@ namespace System.Runtime.Caching
                     // CT note: calling Get from remove leads to an infinite loop and stack overflow,
                     // so I replaced it with a simple ReadFile call. None of the code here actually
                     // uses this object returned, but just in case someone else's outside code does.
-                    FileCachePayload fcp = ReadFile(key, regionName);
+                    FileCachePayload fcp = ReadFile(PayloadMode.Filename, key, regionName);
                     valueToDelete = fcp.Payload;
                     string path = GetCachePath(key, regionName);
                     CurrentCacheSize -= new FileInfo(path).Length;
