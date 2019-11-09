@@ -33,6 +33,57 @@ simpleCache["foo"] = foo;
 Console.WriteLine("Reading foo from simpleCache: {0}", simpleCache["foo"]);
 ```
 
+### New in Version 3
+Version 3 allows for the building of custom caching schemes.  The first release contains
+two caching schemes, `Basic` and `Hashed`.  
+
+The Basic scheme is the tried-and-truescheme employed in all prior versions of FC.  
+When using the Basic scheme, file names are taking from the cache key.  For example,
+executing the command ```simpleCache["foo"] = foo;``` will create a ```foo.dat``` file
+to store the value of foo.  This plaintext conversion can be convenient when debugging
+or when accessing FC cache values from outside of FC.  However, it also has the 
+downside of not supporting cache key names that cannot be used in file names (e.g. /).
+
+Rather than using key names as file names, the Hashed scheme, introduced in Version 3.0, 
+uses hashed representations of key names using the built-in .NET function ```GetHashCode()```.  
+This function produces a numeric representation of each key that is guaranteed to produce
+a valid file name.  However, the downside of this approach is that ```GetHashCode()``` is
+not guaranteed to produce a unique key.  Therefore, FC must account for collisions when
+using the Hashed scheme.  This slight overhead is likely to correspond in slighly higher
+cache retrieval times.  
+
+For now, the default caching scheme is set to `Basic` in order to maintain compatibility with
+prior releases.  Furthermore, while the `Hashed` scheme passes all unit tests, it should 
+be treated as experimental until additional field testing has been conducted.  
+
+#### Using the Basic Caching Scheme
+As the Basic scheme is the default, no special code is required to instantiate a FileCache
+that uses teh Basic scheme.  However, as the default might change in a future release, you
+may want to start instantiating a Basic FileCache in the following manner:
+
+```csharp
+FileCache cache = new FileCache(FileCacheManagers.Basic);
+```
+
+#### Using the Hashed Caching Scheme
+To use the Hashed caching scheme, simply change the CacheManager to Hashed:
+```csharp
+FileCache cache = new FileCache(FileCacheManagers.Hashed);
+```
+
+#### Setting the Default Cache Manager
+It seems reasonable to assume that a programmer will want to maintain consistency of
+caching scemes across a single program.  Alternatively, a programmer may want to 
+upgrade an existing project from Basic to Hashed without having to specify the 
+CacheManager for every FileCache instance.  For these cases, you can set the default
+CacheManager used by setting the static `DefaultCacheManager` property:
+```csharp
+FileCache.DefaultCacheManager = FileCacheManagers.Hashed;
+``` 
+Now, instantiating a FileCache using the parameterless constructor 
+(e.g. ```FileCache cache = new FileCache();```) returns a FileCache that 
+uses the Hashed caching scheme.
+
 ### Serializing Custom Objects ###
 
 Below is an example that allows the caching of custom objects. First, place the
@@ -95,6 +146,13 @@ API, see [the MSDN article on ObjectCache][3]. Additionally, FileCache exposes t
 following methods and properties:
 
 ```csharp
+
+/// <summary>
+/// Allows for the setting of the default cache manager so that it doesn't have to be
+/// specified on every instance creation.
+/// </summary>
+public static FileCacheManagers DefaultCacheManager { get; set; }
+
 /// <summary>
 /// Used to store the default region when accessing the cache via [] 
 /// calls
@@ -151,6 +209,12 @@ public event EventHandler MaxCacheSizeReached = delegate { };
 /// <param name="regionName" />The region to calculate.  If NULL, will return total
 /// size.</param>
 public long GetCacheSize(string regionName = null);
+
+/// <summary>
+/// Clears all FileCache-related items from the disk.  Throws an exception if the cache can't be
+/// deleted.
+/// </summary>
+public void Clear();
 
 /// <summary>
 /// Flushes the file cache using DateTime.Now as the minimum date
