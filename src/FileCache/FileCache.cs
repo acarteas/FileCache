@@ -1,5 +1,5 @@
 ﻿/*
-Copyright 2012, 2013, 2017 Adam Carter (http://adam-carter.com)
+3Copyright 2012, 2013, 2017 Adam Carter (http://adam-carter.com)
 
 This file is part of FileCache (http://github.com/acarteas/FileCache).
 
@@ -22,9 +22,10 @@ namespace System.Runtime.Caching
         private static int _nameCounter = 1;
         private string _name = "";
         private SerializationBinder _binder;
+        private static FileCacheManagers _defaultManager = FileCacheManagers.Basic;
         private string _cacheSubFolder = "cache";
         private string _policySubFolder = "policy";
-        private TimeSpan _cleanInterval = new TimeSpan(7, 0, 0, 0); // default to 1 week
+        private TimeSpan _cleanInterval = new TimeSpan(0, 0, 0, 0); // default to 1 week
         private const string LastCleanedDateFile = "cache.lcd";
         private const string CacheSizeFile = "cache.size";
         // this is a file used to prevent multiple processes from trying to "clean" at the same time
@@ -33,6 +34,18 @@ namespace System.Runtime.Caching
         private PayloadMode _readMode = PayloadMode.Serializable;
         public string CacheDir { get; protected set; }
         
+        public static FileCacheManagers DefaultCacheManager
+        {
+            get
+            {
+                return _defaultManager;
+            }
+            set
+            {
+                _defaultManager = value;
+            }
+        }
+
         /// <summary>
         /// Used to abstract away the low-level details of file management.  This allows
         /// for multiple file formatting schemes based on use case.  
@@ -164,7 +177,7 @@ namespace System.Runtime.Caching
         {
             get
             {
-                return Directory.GetCurrentDirectory();
+                return Path.Combine(Directory.GetCurrentDirectory(), "FileCache");
             }
         }
 
@@ -176,18 +189,7 @@ namespace System.Runtime.Caching
         /// <param name="manager"></param>
         public FileCache(FileCacheManagers manager)
         {
-            Init(false, new TimeSpan(), true, true, manager);
-        }
-
-        /// <summary>
-        /// Creates a new instance of the file cache using the supplied cache directory and cache manager.
-        /// </summary>
-        /// <param name="cacheRoot"></param>
-        /// <param name="manager"></param>
-        public FileCache(string cacheRoot, FileCacheManagers manager)
-        {
-            CacheDir = cacheRoot;
-            Init(false, new TimeSpan(), false, true, manager);
+            Init(manager, false, new TimeSpan(), true, true);
         }
 
         /// <summary>
@@ -200,13 +202,12 @@ namespace System.Runtime.Caching
         /// <param name="cleanInterval">If supplied, sets the interval of time that must occur between self cleans</param>
         public FileCache(
             bool calculateCacheSize = false,
-            TimeSpan cleanInterval = new TimeSpan(),
-            FileCacheManagers manager = FileCacheManagers.Basic
+            TimeSpan cleanInterval = new TimeSpan()
             )
         {
             // CT note: I moved this code to an init method because if the user specified a cache root, that needs to
             // be set before checking if we should clean (otherwise it will look for the file in the wrong place)
-            Init(calculateCacheSize, cleanInterval, true, true, manager);
+            Init(DefaultCacheManager, calculateCacheSize, cleanInterval, true, true);
         }
 
         /// <summary>
@@ -221,11 +222,10 @@ namespace System.Runtime.Caching
         public FileCache(
             string cacheRoot,
             bool calculateCacheSize = false,
-            TimeSpan cleanInterval = new TimeSpan(),
-            FileCacheManagers manager = FileCacheManagers.Basic)
+            TimeSpan cleanInterval = new TimeSpan())
         {
             CacheDir = cacheRoot;
-            Init(calculateCacheSize, cleanInterval, false, true, manager);
+            Init(DefaultCacheManager, calculateCacheSize, cleanInterval, false, true);
         }
 
         /// <summary>
@@ -242,12 +242,11 @@ namespace System.Runtime.Caching
         public FileCache(
             SerializationBinder binder,
             bool calculateCacheSize = false,
-            TimeSpan cleanInterval = new TimeSpan(),
-            FileCacheManagers manager = FileCacheManagers.Basic
+            TimeSpan cleanInterval = new TimeSpan()
             )
         {
             _binder = binder;
-            Init(calculateCacheSize, cleanInterval, true, false, manager);
+            Init(DefaultCacheManager, calculateCacheSize, cleanInterval, true, false);
         }
 
         /// <summary>
@@ -265,13 +264,12 @@ namespace System.Runtime.Caching
             string cacheRoot,
             SerializationBinder binder,
             bool calculateCacheSize = false,
-            TimeSpan cleanInterval = new TimeSpan(),
-            FileCacheManagers manager = FileCacheManagers.Basic
+            TimeSpan cleanInterval = new TimeSpan()
             )
         {
             _binder = binder;
             CacheDir = cacheRoot;
-            Init(calculateCacheSize, cleanInterval, false, false, manager);
+            Init(DefaultCacheManager, calculateCacheSize, cleanInterval, false, false);
         }
 
         #endregion
@@ -279,11 +277,11 @@ namespace System.Runtime.Caching
         #region custom methods
 
         private void Init(
+            FileCacheManagers manager,
             bool calculateCacheSize = false,
             TimeSpan cleanInterval = new TimeSpan(),
             bool setCacheDirToDefault = true,
-            bool setBinderToDefault = true,
-            FileCacheManagers manager = FileCacheManagers.Basic
+            bool setBinderToDefault = true
             )
         {   
             _name = "FileCache_" + _nameCounter;
@@ -758,7 +756,7 @@ namespace System.Runtime.Caching
             }
 
             //null payload?
-            if (payload != null)
+            if (payload.Policy != null && payload.Payload != null)
             {
                 //did the item expire?
                 if (payload.Policy.AbsoluteExpiration < cutoff)
@@ -838,10 +836,9 @@ namespace System.Runtime.Caching
             //AC: This seems inefficient.  Wouldn't it be better to do this using a cursor?
             List<KeyValuePair<string, object>> enumerator = new List<KeyValuePair<string, object>>();
 
-            string directory = Path.Combine(CacheDir, _cacheSubFolder, region);
-            foreach (string filePath in Directory.EnumerateFiles(directory))
+            var keys = CacheManager.GetKeys(regionName);
+            foreach (string key in keys)
             {
-                string key = Path.GetFileNameWithoutExtension(filePath);
                 enumerator.Add(new KeyValuePair<string, object>(key, this.Get(key, regionName)));
             }
             return enumerator.GetEnumerator();

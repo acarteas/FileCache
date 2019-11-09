@@ -23,6 +23,11 @@ namespace FC.UnitTests
     {
         FileCache _cache;
 
+        public HashedFileCacheTest()
+        {
+            FileCache.DefaultCacheManager = FileCacheManagers.Hashed;
+        }
+
         [TestCleanup]
         public void Cleanup()
         {
@@ -32,7 +37,7 @@ namespace FC.UnitTests
         [TestMethod]
         public void AbsoluteExpirationTest()
         {
-            _cache = new FileCache(FileCacheManagers.Hashed);
+            _cache = new FileCache();
             CacheItemPolicy policy = new CacheItemPolicy();
 
             //add an item and have it expire yesterday
@@ -47,7 +52,7 @@ namespace FC.UnitTests
         [TestMethod]
         public void PolicySaveTest()
         {
-            _cache = new FileCache(FileCacheManagers.Hashed);
+            _cache = new FileCache();
             CacheItemPolicy policy = new CacheItemPolicy();
             policy.SlidingExpiration = new TimeSpan(1, 0, 0, 0, 0);
             _cache.Set("test", "test", policy);
@@ -59,7 +64,7 @@ namespace FC.UnitTests
         [TestMethod]
         public void SlidingExpirationTest()
         {
-            _cache = new FileCache(FileCacheManagers.Hashed);
+            _cache = new FileCache();
             CacheItemPolicy policy = new CacheItemPolicy();
 
             //add an item and have it expire 500 ms from now
@@ -89,7 +94,7 @@ namespace FC.UnitTests
         [TestMethod]
         public void CustomObjectSaveTest()
         {
-            _cache = new FileCache(FileCacheManagers.Hashed);
+            _cache = new FileCache();
 
             //create custom object
             CustomObjB customBefore = new CustomObjB()
@@ -124,7 +129,7 @@ namespace FC.UnitTests
         [TestMethod]
         public void CacheSizeTest()
         {
-            _cache = new FileCache("CacheSizeTest", false, new TimeSpan(), FileCacheManagers.Hashed);
+            _cache = new FileCache("CacheSizeTest");
 
             _cache["foo"] = "bar";
             _cache["foo"] = "foobar";
@@ -140,7 +145,7 @@ namespace FC.UnitTests
         [TestMethod]
         public void MaxCacheSizeTest()
         {
-            _cache = new FileCache("MaxCacheSizeTest", false, new TimeSpan(), FileCacheManagers.Hashed);
+            _cache = new FileCache("MaxCacheSizeTest");
             _cache.MaxCacheSize = 0;
             bool isEventCalled = false;
             _cache.MaxCacheSizeReached += delegate (object sender, FileCacheEventArgs e)
@@ -155,7 +160,7 @@ namespace FC.UnitTests
         [TestMethod]
         public void ShrinkCacheTest()
         {
-            _cache = new FileCache("ShrinkTest", false, new TimeSpan(), FileCacheManagers.Hashed);
+            _cache = new FileCache("ShrinkTest");
             Thread.Sleep(500); // Added because appveyor would get -1L in the assertion below. So it wasn't able to acquire the lock
 
             // Test empty case
@@ -191,7 +196,7 @@ namespace FC.UnitTests
         [TestMethod]
         public void AutoShrinkTest()
         {
-            _cache = new FileCache("AutoShrinkTest", FileCacheManagers.Hashed);
+            _cache = new FileCache("AutoShrinkTest");
 
             _cache.Flush();
             _cache.MaxCacheSize = 20000;
@@ -223,7 +228,7 @@ namespace FC.UnitTests
         [TestMethod]
         public void FlushTest()
         {
-            _cache = new FileCache("FlushTest", FileCacheManagers.Hashed);
+            _cache = new FileCache("FlushTest");
 
             _cache["foo"] = "bar";
             Thread.Sleep(500);
@@ -240,7 +245,7 @@ namespace FC.UnitTests
         [TestMethod]
         public void RemoveTest()
         {
-            _cache = new FileCache(FileCacheManagers.Hashed);
+            _cache = new FileCache();
             _cache.Set("test", "test", DateTimeOffset.Now.AddDays(3));
             object result = _cache.Get("test");
             result.Should().Be("test");
@@ -262,7 +267,7 @@ namespace FC.UnitTests
         [TestMethod]
         public void TestCount()
         {
-            _cache = new FileCache("testCount", FileCacheManagers.Hashed);
+            _cache = new FileCache("testCount");
 
             _cache["test"] = "test";
 
@@ -275,7 +280,7 @@ namespace FC.UnitTests
         [TestMethod]
         public void DefaultRegionTest()
         {
-            FileCache cacheWithDefaultRegion = new FileCache(FileCacheManagers.Hashed);
+            FileCache cacheWithDefaultRegion = new FileCache();
             cacheWithDefaultRegion.DefaultRegion = "foo";
             FileCache defaultCache = new FileCache();
             cacheWithDefaultRegion["foo"] = "bar";
@@ -301,7 +306,7 @@ namespace FC.UnitTests
         [TestMethod]
         public void CustomRegionTest()
         {
-            _cache = new FileCache(FileCacheManagers.Hashed);
+            _cache = new FileCache();
             var policy = new CacheItemPolicy { SlidingExpiration = new TimeSpan(0, 5, 0) };
 
             var key = "my_key";
@@ -324,14 +329,14 @@ namespace FC.UnitTests
         {
             //AC: This test passes in debug mode, but not in rutime mode.  Why?
 
-            _cache = new FileCache(FileCacheManagers.Hashed);
+            _cache = new FileCache();
             _cache.AccessTimeout = new TimeSpan(1);
             _cache["primer"] = 0;
-            string filePath = Path.Combine(_cache.CacheDir, "cache", "foo.dat");
+            string filePath = Path.Combine(_cache.CacheDir, "cache", "-1887501042_0.dat");
             FileStream stream = File.Open(filePath, FileMode.Create);
             try
             {
-                object result = _cache["foo"];
+                object result = _cache["primer"];
 
                 //file access should fail.  If it doesn't, the test fails.
                 true.Should().BeFalse();
@@ -347,7 +352,7 @@ namespace FC.UnitTests
         [TestMethod]
         public void DefaultPolicyTest()
         {
-            _cache = new FileCache(FileCacheManagers.Hashed);
+            _cache = new FileCache();
             CacheItemPolicy policy = new CacheItemPolicy();
             policy.SlidingExpiration = new TimeSpan(1);
             _cache.DefaultPolicy = policy;
@@ -360,7 +365,7 @@ namespace FC.UnitTests
         [TestMethod]
         public void GetEnumeratorTest()
         {
-            _cache = new FileCache(FileCacheManagers.Hashed);
+            _cache = new FileCache();
             _cache["foo"] = 1;
             _cache["bar"] = 2;
 
@@ -373,7 +378,7 @@ namespace FC.UnitTests
         [TestMethod]
         public void CleanCacheTest()
         {
-            _cache = new FileCache("CleanCacheTest", FileCacheManagers.Hashed);
+            _cache = new FileCache("CleanCacheTest");
 
             _cache.Add("foo", 1, DateTime.Now); // expires immediately
             _cache.Add("bar", 2, DateTime.Now + TimeSpan.FromDays(1)); // set to expire tomorrow
