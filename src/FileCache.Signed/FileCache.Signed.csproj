@@ -22,6 +22,7 @@
     <Compile Include="..\FileCache\FileCacheManager.cs" Link="FileCacheManager.cs" />
     <Compile Include="..\FileCache\FileCacheManagerFactory.cs" Link="FileCacheManagerFactory.cs" />
     <Compile Include="..\FileCache\FileCachePayload.cs" Link="FileCachePayload.cs" />
+    <Compile Include="..\FileCache\HashedFileCacheManager.cs" Link="HashedFileCacheManager.cs" />
     <Compile Include="..\FileCache\PriortyQueue.cs" Link="PriortyQueue.cs" />
     <Compile Include="..\FileCache\SerializableCacheItemPolicy.cs" Link="SerializableCacheItemPolicy.cs" />
   </ItemGroup>

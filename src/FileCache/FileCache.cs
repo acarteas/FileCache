@@ -171,6 +171,26 @@ namespace System.Runtime.Caching
         #region constructors
 
         /// <summary>
+        /// Creates a default instance of the file cache using the supplied file cache manager.
+        /// </summary>
+        /// <param name="manager"></param>
+        public FileCache(FileCacheManagers manager)
+        {
+            Init(false, new TimeSpan(), true, true, manager);
+        }
+
+        /// <summary>
+        /// Creates a new instance of the file cache using the supplied cache directory and cache manager.
+        /// </summary>
+        /// <param name="cacheRoot"></param>
+        /// <param name="manager"></param>
+        public FileCache(string cacheRoot, FileCacheManagers manager)
+        {
+            CacheDir = cacheRoot;
+            Init(false, new TimeSpan(), false, true, manager);
+        }
+
+        /// <summary>
         /// Creates a default instance of the file cache.  Don't use if you plan to serialize custom objects
         /// </summary>
         /// <param name="calculateCacheSize">If true, will calcualte the cache's current size upon new object creation.
@@ -578,44 +598,29 @@ namespace System.Runtime.Caching
             // prevent other threads from altering stuff while we delete junk
             using (FileStream cLock = GetCleaningLock())
             {
+                //AC: Not added by me.  What does this do?
                 if (cLock == null)
+                {
                     return;
+                }
 
-                //AC note: First parameter is unused, so just pass in garbage ("DummyValue")
-                string policyPath = Path.GetDirectoryName(CacheManager.GetPolicyPath("DummyValue", regionName));
-                string cachePath = Path.GetDirectoryName(CacheManager.GetCachePath("DummyValue", regionName));
-                FlushHelper(new DirectoryInfo(policyPath), minDate);
-                FlushHelper(new DirectoryInfo(cachePath), minDate);
+                IEnumerable<string> keys = CacheManager.GetKeys();
+                foreach (string key in keys)
+                {
+                    string policyPath = CacheManager.GetPolicyPath(key, regionName);
+                    string cachePath = CacheManager.GetCachePath(key, regionName);
 
-                // Update the Cache size
-                CurrentCacheSize = GetCacheSize();
+                    // Update the Cache size
+                    CurrentCacheSize = GetCacheSize();
+                    //if either policy or cache are stale, delete both
+                    if (File.GetLastAccessTime(policyPath) < minDate || File.GetLastAccessTime(cachePath) < minDate)
+                    {
+                        CurrentCacheSize -= CacheManager.DeleteFile(key, regionName);
+                    }
+                }
 
                 // unlock
                 cLock.Close();
-            }
-        }
-
-        /// <summary>
-        /// Helper method for public flush
-        /// </summary>
-        /// <param name="root"></param>
-        /// <param name="minDate"></param>
-        private void FlushHelper(DirectoryInfo root, DateTime minDate)
-        {
-            // check files.
-            foreach (FileInfo fi in root.EnumerateFiles())
-            {
-                //is the file stale?
-                if(minDate > File.GetLastAccessTime(fi.FullName))
-                {
-                    File.Delete(fi.FullName);
-                }
-            }
-
-            // check subdirectories
-            foreach (DirectoryInfo di in root.EnumerateDirectories())
-            {
-                FlushHelper(di, minDate);
             }
         }
 
