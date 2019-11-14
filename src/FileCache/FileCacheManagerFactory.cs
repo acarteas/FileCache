@@ -12,7 +12,7 @@ namespace System.Runtime.Caching
         {
             FileCacheManager instance = null;
 
-            switch(type)
+            switch (type)
             {
                 case FileCacheManagers.Basic:
                     instance = new BasicFileCacheManager();

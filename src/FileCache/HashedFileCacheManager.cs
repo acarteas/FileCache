@@ -45,7 +45,7 @@ namespace System.Runtime.Caching
                     try
                     {
                         SerializableCacheItemPolicy policy = Deserialize(fileName) as SerializableCacheItemPolicy;
-                        if(key.CompareTo(policy.Key) == 0)
+                        if (key.CompareTo(policy.Key) == 0)
                         {
                             //correct key found!
                             found = true;
@@ -78,7 +78,7 @@ namespace System.Runtime.Caching
         /// Builds a string that will place the specified file name within the appropriate 
         /// cache and workspace folder.
         /// </summary>
-        /// <param name="FileName"></param>
+        /// <param name="key"></param>
         /// <param name="regionName"></param>
         public override string GetCachePath(string key, string regionName = null)
         {
@@ -99,7 +99,7 @@ namespace System.Runtime.Caching
         /// Returns a list of keys for a given region.  
         /// </summary>
         /// <param name="regionName"></param>
-        public override string[] GetKeys(string regionName = null)
+        public override IEnumerable<string> GetKeys(string regionName = null)
         {
             string region = "";
             if (string.IsNullOrEmpty(regionName) == false)
@@ -121,7 +121,6 @@ namespace System.Runtime.Caching
                     {
 
                     }
-                    
                 }
             }
             return keys.ToArray();
@@ -130,7 +129,7 @@ namespace System.Runtime.Caching
         /// <summary>
         /// Builds a string that will get the path to the supplied file's policy file
         /// </summary>
-        /// <param name="FileName"></param>
+        /// <param name="key"></param>
         /// <param name="regionName"></param>
         /// <returns></returns>
         public override string GetPolicyPath(string key, string regionName = null)

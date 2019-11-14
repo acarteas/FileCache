@@ -24,12 +24,91 @@ namespace System.Runtime.Caching
         /// </summary>
         public TimeSpan AccessTimeout { get; set; }
 
+        protected virtual object DeserializePayloadData(string fileName, SerializationBinder objectBinder = null)
+        {
+            object data = null;
+            if (File.Exists(fileName))
+            {
+                using (FileStream stream = GetStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read))
+                {
+                    BinaryFormatter formatter = new BinaryFormatter();
+
+                    //AC: From http://spazzarama.com//2009/06/25/binary-deserialize-unable-to-find-assembly/
+                    //    Needed to deserialize custom objects
+                    if (objectBinder != null)
+                    {
+                        //take supplied binder over default binder
+                        formatter.Binder = objectBinder;
+                    }
+                    else if (Binder != null)
+                    {
+                        formatter.Binder = Binder;
+                    }
+                    try
+                    {
+                        data = formatter.Deserialize(stream);
+                    }
+                    catch (SerializationException)
+                    {
+                        data = null;
+                    }
+                }
+            }
+
+            return data;
+        }
+
+        /// <summary>
+        /// This function serves to centralize file reads within this class.
+        /// </summary>
+        /// <param name="mode">the payload reading mode</param>
+        /// <param name="key"></param>
+        /// <param name="objectBinder"></param>
+        /// <returns></returns>
+        // TODO: This was protected, but since Simon Thum's additions other methods require this. We need to merge with that change to move whatever is relevant behind this interface
+        // and restore the visibility to protected
+        public virtual FileCachePayload ReadFile(FileCache.PayloadMode mode, string key, string regionName = null, SerializationBinder objectBinder = null)
+        {
+            string cachePath = GetCachePath(key, regionName);
+            string policyPath = GetPolicyPath(key, regionName);
+            FileCachePayload payload = new FileCachePayload(null);
+            switch(mode)
+            {
+                case FileCache.PayloadMode.Filename:
+                    payload.Payload = cachePath;
+                    break;
+                case FileCache.PayloadMode.Serializable:
+                    payload.Payload = Deserialize(cachePath);
+                    break;
+                case FileCache.PayloadMode.RawBytes:
+                    payload.Payload = LoadRawPayloadData(cachePath);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
+            }
+            try
+            {
+                // TODO: In part of the merge it looked like the policy was force serialized with LocalCacheBinder(), is this intended?
+                payload.Policy = Deserialize(policyPath) as SerializableCacheItemPolicy;
+            }
+            catch
+            {
+                payload.Policy = new SerializableCacheItemPolicy();
+            }
+            return payload;
+        }
+
+        private object LoadRawPayloadData(string cachePath)
+        {
+            throw new NotSupportedException("Reading raw payload is not currently supported.");
+        }
+
         protected virtual object Deserialize(string fileName, SerializationBinder objectBinder = null)
         {
             object data = null;
             if (File.Exists(fileName))
             {
-                using (FileStream stream = GetStream(fileName, FileMode.Open, FileAccess.Read))
+                using (FileStream stream = GetStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read))
                 {
                     BinaryFormatter formatter = new BinaryFormatter();
 
@@ -62,36 +141,9 @@ namespace System.Runtime.Caching
         }
 
         /// <summary>
-        /// This function serves to centralize file reads within this class.
-        /// </summary>
-        /// <param name="path"></param>
-        /// <param name="objectBinder"></param>
-        /// <returns></returns>
-        public virtual FileCachePayload ReadFile(string key, string regionName = null, SerializationBinder objectBinder = null)
-        {
-            string cachePath = GetCachePath(key, regionName);
-            string policyPath = GetPolicyPath(key, regionName);
-            FileCachePayload payload = new FileCachePayload(null);
-            payload.Payload = Deserialize(cachePath);
-            try
-            {
-                payload.Policy = Deserialize(policyPath) as SerializableCacheItemPolicy;
-            }
-            catch
-            {
-                payload.Policy = new SerializableCacheItemPolicy();
-            }
-            return payload;
-        }
-
-        /// <summary>
         /// This function serves to centralize file writes within this class
         /// </summary>
-        /// <param name="key"></param>
-        /// <param name="data"></param>
-        /// <param name="regionName"></param>
-        /// <returns>A long representing the size of the file written to the cache</returns>
-        public virtual long WriteFile(string key, FileCachePayload data, string regionName = null)
+        public virtual long WriteFile(FileCache.PayloadMode mode, string key, FileCachePayload data, string regionName = null, bool policyUpdateOnly = false)
         {
             string cachedPolicy = GetPolicyPath(key, regionName);
             string cachedItemPath = GetCachePath(key, regionName);
@@ -100,31 +152,59 @@ namespace System.Runtime.Caching
             //ensure that the cache policy contains the correct key
             data.Policy.Key = key;
 
-            //remove current item / policy from cache size calculations
-            if (File.Exists(cachedItemPath))
+            if (!policyUpdateOnly)
             {
-                cacheSizeDelta -= new FileInfo(cachedItemPath).Length;
+                long oldBlobSize = 0;
+                if (File.Exists(cachedItemPath))
+                {
+                    oldBlobSize = new FileInfo(cachedItemPath).Length;
+                }
+
+                switch (mode)
+                {
+                    case FileCache.PayloadMode.Serializable:
+                        using (FileStream stream = GetStream(cachedItemPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                        {
+
+                            BinaryFormatter formatter = new BinaryFormatter();
+                            formatter.Serialize(stream, data.Payload);
+                        }
+                        break;
+                    case FileCache.PayloadMode.RawBytes:
+                        using (FileStream stream = GetStream(cachedItemPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                        {
+
+                            if (data.Payload is byte[])
+                            {
+                                byte[] dataPayload = (byte[])data.Payload;
+                                stream.Write(dataPayload, 0, dataPayload.Length);
+                            }
+                            else if (data.Payload is Stream)
+                            {
+                                Stream dataPayload = (Stream)data.Payload;
+                                dataPayload.CopyTo(stream);
+                                // no close or the like, we are not the owner
+                            }
+                        }
+                        break;
+
+                    case FileCache.PayloadMode.Filename:
+                        File.Copy((string)data.Payload, cachedItemPath, true);
+                        break;
+                }
+
+                //adjust cache size (while we have the file to ourselves)
+                cacheSizeDelta += new FileInfo(cachedItemPath).Length - oldBlobSize;
             }
+
+            //remove current policy file from cache size calculations
             if (File.Exists(cachedPolicy))
             {
                 cacheSizeDelta -= new FileInfo(cachedPolicy).Length;
             }
 
-            //write the object payload (lock the file so we can write to it and force others to wait
-            //for us to finish)
-            using (FileStream stream = GetStream(cachedItemPath, FileMode.Create, FileAccess.Write))
-            {
-                BinaryFormatter formatter = new BinaryFormatter();
-                formatter.Serialize(stream, data.Payload);
-
-                //adjust cache size (while we have the file to ourselves)
-                cacheSizeDelta += new FileInfo(cachedItemPath).Length;
-
-                stream.Close();
-            }
-
             //write the cache policy
-            using (FileStream stream = GetStream(cachedPolicy, FileMode.Create, FileAccess.Write))
+            using (FileStream stream = GetStream(cachedPolicy, FileMode.Create, FileAccess.Write, FileShare.None))
             {
                 BinaryFormatter formatter = new BinaryFormatter();
                 formatter.Serialize(stream, data.Policy);
@@ -135,15 +215,6 @@ namespace System.Runtime.Caching
                 stream.Close();
             }
 
-            // try to update the last access time
-            try
-            {
-                File.SetLastAccessTime(cachedItemPath, DateTime.Now);
-            }
-            catch (IOException)
-            {
-            }
-
             return cacheSizeDelta;
         }
 
@@ -151,21 +222,22 @@ namespace System.Runtime.Caching
         /// Builds a string that will place the specified file name within the appropriate 
         /// cache and workspace folder.
         /// </summary>
-        /// <param name="FileName"></param>
+        /// <param name="key"></param>
         /// <param name="regionName"></param>
         /// <returns></returns>
         public abstract string GetCachePath(string key, string regionName = null);
-
+        
         /// <summary>
         /// Returns a list of keys for a given region.  
         /// </summary>
         /// <param name="regionName"></param>
-        public abstract string[] GetKeys(string regionName = null);
+        /// <returns></returns>
+        public abstract IEnumerable<string> GetKeys(string regionName = null);
 
         /// <summary>
         /// Builds a string that will get the path to the supplied file's policy file
         /// </summary>
-        /// <param name="FileName"></param>
+        /// <param name="key"></param>
         /// <param name="regionName"></param>
         /// <returns></returns>
         public abstract string GetPolicyPath(string key, string regionName = null);
@@ -189,7 +261,7 @@ namespace System.Runtime.Caching
                 {
                     try
                     {
-                        using (FileStream stream = GetStream(path, FileMode.Open, FileAccess.Read))
+                        using (FileStream stream = GetStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
                         {
                             BinaryFormatter formatter = new BinaryFormatter();
                             try
@@ -229,7 +301,7 @@ namespace System.Runtime.Caching
             string path = Path.Combine(CacheDir, filename);
 
             // write the data to the file
-            using (FileStream stream = GetStream(path, FileMode.Create, FileAccess.Write))
+            using (FileStream stream = GetStream(path, FileMode.Create, FileAccess.Write, FileShare.Write))
             {
                 BinaryFormatter formatter = new BinaryFormatter();
                 formatter.Serialize(stream, data);
@@ -243,8 +315,9 @@ namespace System.Runtime.Caching
         /// <param name="path"></param>
         /// <param name="mode"></param>
         /// <param name="access"></param>
+        /// <param name="share"></param>
         /// <returns></returns>
-        protected FileStream GetStream(string path, FileMode mode, FileAccess access, bool lockfile = false)
+        protected FileStream GetStream(string path, FileMode mode, FileAccess access, FileShare share)
         {
             FileStream stream = null;
             TimeSpan interval = new TimeSpan(0, 0, 0, 0, 50);
@@ -253,14 +326,7 @@ namespace System.Runtime.Caching
             {
                 try
                 {
-                    if (lockfile)
-                    {
-                        stream = File.Open(path, mode, access, FileShare.None);
-                    }
-                    else
-                    {
-                        stream = File.Open(path, mode, access, FileShare.ReadWrite);
-                    }
+                    stream = File.Open(path, mode, access, share);
                 }
                 catch (IOException ex)
                 {
@@ -294,7 +360,7 @@ namespace System.Runtime.Caching
             // while we're trying to remove something, another thread has already removed it.
             try
             {
-                FileCachePayload fcp = ReadFile(key, regionName);
+                FileCachePayload fcp = ReadFile(FileCache.PayloadMode.Filename, key, regionName);
                 string path = GetCachePath(key, regionName);
                 bytesFreed -= new FileInfo(path).Length;
                 File.Delete(path);

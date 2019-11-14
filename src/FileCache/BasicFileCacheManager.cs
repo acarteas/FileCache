@@ -10,13 +10,12 @@ namespace System.Runtime.Caching
 {
     public class BasicFileCacheManager : FileCacheManager
     {
-
         /// <summary>
         /// Returns a list of keys for a given region.  
         /// </summary>
         /// <param name="regionName"></param>
         /// <returns></returns>
-        public override string[] GetKeys(string regionName = null)
+        public override IEnumerable<string> GetKeys(string regionName = null)
         {
             string region = "";
             if (string.IsNullOrEmpty(regionName) == false)
@@ -24,15 +23,13 @@ namespace System.Runtime.Caching
                 region = regionName;
             }
             string directory = Path.Combine(CacheDir, CacheSubFolder, region);
-            List<string> keys = new List<string>();
             if (Directory.Exists(directory))
             {
-                foreach (string file in Directory.GetFiles(directory))
+                foreach (string file in Directory.EnumerateFiles(directory))
                 {
-                    keys.Add(Path.GetFileNameWithoutExtension(file));
+                    yield return Path.GetFileNameWithoutExtension(file);
                 }
             }
-            return keys.ToArray();
         }
 
         /// <summary>
@@ -42,14 +39,14 @@ namespace System.Runtime.Caching
         /// <param name="FileName"></param>
         /// <param name="regionName"></param>
         /// <returns></returns>
-        public override string GetCachePath(string key, string regionName = null)
+        public override string GetCachePath(string FileName, string regionName = null)
         {
             if (regionName == null)
             {
                 regionName = "";
             }
             string directory = Path.Combine(CacheDir, CacheSubFolder, regionName);
-            string filePath = Path.Combine(directory, Path.GetFileNameWithoutExtension(key) + ".dat");
+            string filePath = Path.Combine(directory, Path.GetFileNameWithoutExtension(FileName) + ".dat");
             if (!Directory.Exists(directory))
             {
                 Directory.CreateDirectory(directory);
@@ -60,7 +57,7 @@ namespace System.Runtime.Caching
         /// <summary>
         /// Builds a string that will get the path to the supplied file's policy file
         /// </summary>
-        /// <param name="FileName"></param>
+        /// <param name="key"></param>
         /// <param name="regionName"></param>
         /// <returns></returns>
         public override string GetPolicyPath(string key, string regionName = null)
@@ -77,6 +74,7 @@ namespace System.Runtime.Caching
             }
             return filePath;
         }
+
 
     }
 }

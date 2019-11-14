@@ -1,8 +1,6 @@
 ﻿/*
 Copyright 2012, 2013, 2017 Adam Carter (http://adam-carter.com)
-
 This file is part of FileCache (http://github.com/acarteas/FileCache).
-
 FileCache is distributed under the Apache License 2.0.
 Consult "LICENSE.txt" included in this package for the Apache License 2.0.
 */
@@ -24,7 +22,6 @@ namespace FC.UnitTests
     public class HashedFileCacheTest
     {
         FileCache _cache;
-        
         public HashedFileCacheTest()
         {
             FileCache.DefaultCacheManager = FileCacheManagers.Hashed;
@@ -213,7 +210,7 @@ namespace FC.UnitTests
             for (int i = 0; i < 100; i++)
             {
                 _cache["foo" + i] = "bar";
-
+                
                 // test to make sure it leaves items that have been recently accessed.
                 if (i % 5 == 0 && i != 0)
                 {
@@ -330,7 +327,7 @@ namespace FC.UnitTests
             _cache = new FileCache();
             _cache.AccessTimeout = new TimeSpan(1);
             _cache["primer"] = 0;
-            string filePath = Path.Combine(_cache.CacheDir, "cache", "-1887501042_0.dat");
+            string filePath = Path.Combine(_cache.CacheDir, "cache", "primer".GetHashCode() + "_0.dat");
             FileStream stream = File.Open(filePath, FileMode.Create);
             try
             {
