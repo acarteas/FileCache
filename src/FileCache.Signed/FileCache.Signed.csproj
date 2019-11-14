@@ -15,10 +15,14 @@
     <Version>0.0.0</Version>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\FileCache\BasicFileCacheManager.cs" Link="BasicFileCacheManager.cs" />
     <Compile Include="..\FileCache\FileCache.cs" Link="FileCache.cs" />
     <Compile Include="..\FileCache\FileCacheBinder.cs" Link="FileCacheBinder.cs" />
     <Compile Include="..\FileCache\FileCacheEventArgs.cs" Link="FileCacheEventArgs.cs" />
+    <Compile Include="..\FileCache\FileCacheManager.cs" Link="FileCacheManager.cs" />
+    <Compile Include="..\FileCache\FileCacheManagerFactory.cs" Link="FileCacheManagerFactory.cs" />
     <Compile Include="..\FileCache\FileCachePayload.cs" Link="FileCachePayload.cs" />
+    <Compile Include="..\FileCache\HashedFileCacheManager.cs" Link="HashedFileCacheManager.cs" />
     <Compile Include="..\FileCache\PriortyQueue.cs" Link="PriortyQueue.cs" />
     <Compile Include="..\FileCache\SerializableCacheItemPolicy.cs" Link="SerializableCacheItemPolicy.cs" />
   </ItemGroup>
