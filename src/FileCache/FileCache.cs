@@ -921,8 +921,6 @@ namespace System.Runtime.Caching
             
             if (Contains(key, regionName) == true)
             {
-                //Holds the value that we will return to the user
-                FileCachePayload fcp = CacheManager.ReadFile(key, regionName);
 
                 // Because of the possibility of multiple threads accessing this, it's possible that
                 // while we're trying to remove something, another thread has already removed it.
