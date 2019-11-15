@@ -37,8 +37,8 @@ Console.WriteLine("Reading foo from simpleCache: {0}", simpleCache["foo"]);
 Version 3 allows for the building of custom caching schemes.  The first release contains
 two caching schemes, `Basic` and `Hashed`.  
 
-The Basic scheme is the tried-and-truescheme employed in all prior versions of FC.  When 
-using the Basic scheme, file names are taking from the cache key.  For example, executing 
+The Basic scheme is the tried-and-true scheme employed in all prior versions of FC.  When 
+using the Basic scheme, file names are taken from the cache key.  For example, executing 
 the command ```simpleCache["foo"] = foo;``` will create a ```foo.dat``` file
 to store the value of foo.  This plaintext conversion can be convenient when debugging
 or when accessing FC cache values from outside of FC.  However, it also has the 
@@ -53,8 +53,8 @@ account for collisions when using the Hashed scheme.  This slight overhead is li
 correspond in slighly higher cache retrieval times.  
 
 For now, the default caching scheme is set to `Basic` in order to maintain compatibility with
-prior releases.  Furthermore, while the `Hashed` scheme passes all unit tests, it should 
-be treated as experimental until additional field testing has been conducted.  
+prior releases.  Furthermore, while the `Hashed` scheme passes all unit tests, *_it should 
+be treated as experimental until additional field testing has been conducted._*  
 
 #### Using the Basic Caching Scheme
 As the Basic scheme is the default, no special code is required to instantiate a FileCache
@@ -72,8 +72,8 @@ FileCache cache = new FileCache(FileCacheManagers.Hashed);
 ```
 
 #### Setting the Default Cache Manager
-It seems reasonable to assume that a programmer will want to maintain consistency of
-caching scemes across a single program.  Alternatively, a programmer may want to 
+It seems reasonable to assume that a programmer will want to employ the same 
+caching sceme across their single program.  Alternatively, a programmer may want to 
 upgrade an existing project from Basic to Hashed without having to specify the 
 CacheManager for every FileCache instance.  For these cases, you can set the default
 CacheManager used by setting the static `DefaultCacheManager` property:
@@ -143,7 +143,7 @@ Complete API
 
 FileCache implements [System.Runtime.Caching.ObjectCache][3]. For the complete base
 API, see [the MSDN article on ObjectCache][3]. Additionally, FileCache exposes the
-following methods and properties:
+following additional methods and properties:
 
 ```csharp
 
