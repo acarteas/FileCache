@@ -1,8 +1,6 @@
 ﻿/*
 Copyright 2012, 2013, 2017 Adam Carter (http://adam-carter.com)
-
 This file is part of FileCache (http://github.com/acarteas/FileCache).
-
 FileCache is distributed under the Apache License 2.0.
 Consult "LICENSE.txt" included in this package for the Apache License 2.0.
 */
@@ -21,9 +19,13 @@ namespace FC.UnitTests
     ///to contain all FileCacheTest Unit Tests
     ///</summary>
     [TestClass]
-    public class FileCacheTest
+    public class HashedFileCacheTest
     {
         FileCache _cache;
+        public HashedFileCacheTest()
+        {
+            FileCache.DefaultCacheManager = FileCacheManagers.Hashed;
+        }
 
         [TestCleanup]
         public void Cleanup()
@@ -135,8 +137,6 @@ namespace FC.UnitTests
             cacheSize.Should().NotBe(0);
 
             _cache.Remove("foo");
-            cacheSize = _cache.GetCacheSize();
-            cacheSize.Should().Be(0);
             cacheSize = _cache.CurrentCacheSize;
             cacheSize.Should().Be(0);
         }
@@ -147,7 +147,7 @@ namespace FC.UnitTests
             _cache = new FileCache("MaxCacheSizeTest");
             _cache.MaxCacheSize = 0;
             bool isEventCalled = false;
-            _cache.MaxCacheSizeReached += delegate(object sender, FileCacheEventArgs e)
+            _cache.MaxCacheSizeReached += delegate (object sender, FileCacheEventArgs e)
             {
                 isEventCalled = true;
             };
@@ -175,7 +175,7 @@ namespace FC.UnitTests
             long size2 = _cache.GetCacheSize() - size1;
             _cache["item3"] = "bar3ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
             Thread.Sleep(500);
-            long size3 = _cache.GetCacheSize() - size2 - size1; 
+            long size3 = _cache.GetCacheSize() - size2 - size1;
             _cache["item4"] = "bar3fffffffffsdfsdfffffffffffffsdfffffffffffdddddddddddddddddddffffff";
             long size4 = _cache.GetCacheSize() - size3 - size2 - size1;
 
@@ -199,7 +199,7 @@ namespace FC.UnitTests
 
             _cache.Flush();
             _cache.MaxCacheSize = 20000;
-            _cache.CacheResized += delegate(object sender, FileCacheEventArgs args)
+            _cache.CacheResized += delegate (object sender, FileCacheEventArgs args)
             {
                 _cache["foo0"].Should().BeNull();
                 _cache["foo10"].Should().NotBeNull();
@@ -210,13 +210,9 @@ namespace FC.UnitTests
             for (int i = 0; i < 100; i++)
             {
                 _cache["foo" + i] = "bar";
-
-                // test to make sure it doesn't crash if one of the files is missing
-                if (i == 10)
-                    File.Delete(_cache.CacheDir + "/cache/foo9.dat");
-
+                
                 // test to make sure it leaves items that have been recently accessed.
-                if (i%5 == 0 && i != 0)
+                if (i % 5 == 0 && i != 0)
                 {
                     var foo10 = _cache.Get("foo10");
                     var foo40 = _cache.Get("foo40");
@@ -271,7 +267,7 @@ namespace FC.UnitTests
             _cache["test"] = "test";
 
             object result = _cache.Get("test");
-            
+
             result.Should().Be("test");
             _cache.GetCount().Should().Be(1);
         }
@@ -331,11 +327,11 @@ namespace FC.UnitTests
             _cache = new FileCache();
             _cache.AccessTimeout = new TimeSpan(1);
             _cache["primer"] = 0;
-            string filePath = Path.Combine(_cache.CacheDir, "cache", "foo.dat");
+            string filePath = Path.Combine(_cache.CacheDir, "cache", "primer".GetHashCode() + "_0.dat");
             FileStream stream = File.Open(filePath, FileMode.Create);
             try
             {
-                object result = _cache["foo"];
+                object result = _cache["primer"];
 
                 //file access should fail.  If it doesn't, the test fails.
                 true.Should().BeFalse();
@@ -386,38 +382,6 @@ namespace FC.UnitTests
 
             _cache["foo"].Should().BeNull();
             _cache["bar"].Should().NotBeNull();
-        }
-
-        [TestMethod]
-        public void RawFileCacheTest()
-        {
-            // Test with filename based payload
-            FileCache perfCache = new FileCache("filePayload");
-            perfCache.PayloadReadMode = FileCache.PayloadMode.Filename;
-            perfCache.PayloadWriteMode = FileCache.PayloadMode.RawBytes;
-
-            perfCache["mybytes"] = new byte[] { 4, 2 };
-            perfCache.Get("mybytes").Should().BeOfType(typeof(string));
-            File.Exists((string)perfCache.Get("mybytes")).Should().BeTrue();
-        }
-
-
-        [TestMethod]
-        public void RawFileWithExpiryTest()
-        {
-            // Test with sliding expiry
-            FileCache perfCacheWithExpiry = new FileCache("filePayloadExpiry");
-            var pol = new CacheItemPolicy();
-            pol.SlidingExpiration = new TimeSpan(0, 0, 2);
-            perfCacheWithExpiry.DefaultPolicy = pol;
-            perfCacheWithExpiry.FilenameAsPayloadSafetyMargin = new TimeSpan(0, 0, 1);
-            perfCacheWithExpiry.PayloadReadMode = FileCache.PayloadMode.Filename;
-            perfCacheWithExpiry.PayloadWriteMode = FileCache.PayloadMode.RawBytes;
-
-            perfCacheWithExpiry["mybytes"] = new byte[] { 4, 2 };
-            File.Exists((string)perfCacheWithExpiry.Get("mybytes")).Should().BeTrue();
-            Thread.Sleep(2000);
-            perfCacheWithExpiry.Get("mybytes").Should().BeNull();
         }
     }
 }
