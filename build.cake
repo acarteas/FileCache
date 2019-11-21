@@ -41,7 +41,6 @@ Task("Restore-NuGet-Packages")
         settings
             .WithTarget("Restore")
             .SetConfiguration(configuration)
-            .UseToolVersion(MSBuildToolVersion.VS2017)
             );
 });
 
@@ -54,7 +53,6 @@ Task("Build")
 		settings
             .WithTarget("Build")
             .SetConfiguration(configuration)
-            .UseToolVersion(MSBuildToolVersion.VS2017)
             );
 });
 
@@ -78,7 +76,6 @@ Task("Create-NuGet-Packages")
     var settings = new MSBuildSettings()
         .WithTarget("Pack")
         .SetConfiguration(configuration)
-        .UseToolVersion(MSBuildToolVersion.VS2017)
         .WithProperty("PackageOutputPath",artifactDirectory);
 
     // Pack the Sln (unit tests has the <IsPackable> to false)
