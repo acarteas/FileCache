@@ -59,6 +59,7 @@ namespace FC.UnitTests
             policy.SlidingExpiration.Should().Be(returnPolicy.SlidingExpiration);
         }
 
+        [TestMethod]
         public void SlidingExpirationTest()
         {
             _cache = new FileCache();
