@@ -461,22 +461,30 @@ namespace System.Runtime.Caching
             {
                 if (cLock == null)
                     return 0;
-                
-                foreach (string key in GetKeys(regionName))
+
+                IEnumerable<string> regions =
+                    string.IsNullOrEmpty(regionName)
+                        ? CacheManager.GetRegions()
+                        : new List<string>(1) { regionName };
+
+                foreach (var region in regions)
                 {
-                    CacheItemPolicy policy = GetPolicy(key, regionName);
-                    if (policy.AbsoluteExpiration < DateTime.Now)
+                    foreach (string key in GetKeys(region))
                     {
-                        try
+                        CacheItemPolicy policy = GetPolicy(key, region);
+                        if (policy.AbsoluteExpiration < DateTime.Now)
                         {
-                            string cachePath = CacheManager.GetCachePath(key, regionName);
-                            string policyPath = CacheManager.GetPolicyPath(key, regionName);
-                            CacheItemReference ci = new CacheItemReference(key, cachePath, policyPath);
-                            Remove(key, regionName); // CT note: Remove will update CurrentCacheSize
-                            removed += ci.Length;
+                            try
+                            {
+                                string cachePath = CacheManager.GetCachePath(key, region);
+                                string policyPath = CacheManager.GetPolicyPath(key, region);
+                                CacheItemReference ci = new CacheItemReference(key, region, cachePath, policyPath);
+                                Remove(key, region); // CT note: Remove will update CurrentCacheSize
+                                removed += ci.Length;
+                            }
+                            catch (Exception) // skip if the file cannot be accessed
+                            { }
                         }
-                        catch (Exception) // skip if the file cannot be accessed
-                        { }
                     }
                 }
 
@@ -506,19 +514,27 @@ namespace System.Runtime.Caching
             //Heap of all CacheReferences
             PriortyQueue<CacheItemReference> cacheReferences = new PriortyQueue<CacheItemReference>();
 
-            //build a heap of all files in cache region
-            foreach (string key in GetKeys(regionName))
+            IEnumerable<string> regions =
+                string.IsNullOrEmpty(regionName)
+                    ? CacheManager.GetRegions()
+                    : new List<string>(1) { regionName };
+
+            foreach (var region in regions)
             {
-                try
+                //build a heap of all files in cache region
+                foreach (string key in GetKeys(region))
                 {
-                    //build item reference
-                    string cachePath = CacheManager.GetCachePath(key, regionName);
-                    string policyPath = CacheManager.GetPolicyPath(key, regionName);
-                    CacheItemReference ci = new CacheItemReference(key, cachePath, policyPath);
-                    cacheReferences.Enqueue(ci);
-                }
-                catch(FileNotFoundException)
-                {
+                    try
+                    {
+                        //build item reference
+                        string cachePath = CacheManager.GetCachePath(key, region);
+                        string policyPath = CacheManager.GetPolicyPath(key, region);
+                        CacheItemReference ci = new CacheItemReference(key, region, cachePath, policyPath);
+                        cacheReferences.Enqueue(ci);
+                    }
+                    catch (FileNotFoundException)
+                    {
+                    }
                 }
             }
 
@@ -529,7 +545,7 @@ namespace System.Runtime.Caching
                 //remove oldest item
                 CacheItemReference oldest = cacheReferences.Dequeue();
                 removedBytes += oldest.Length;
-                Remove(oldest.Key, regionName);
+                Remove(oldest.Key, oldest.Region);
             }
             return removedBytes;
         }
@@ -648,18 +664,26 @@ namespace System.Runtime.Caching
                     return;
                 }
 
-                IEnumerable<string> keys = CacheManager.GetKeys();
-                foreach (string key in keys)
-                {
-                    string policyPath = CacheManager.GetPolicyPath(key, regionName);
-                    string cachePath = CacheManager.GetCachePath(key, regionName);
+                IEnumerable<string> regions =
+                    string.IsNullOrEmpty(regionName)
+                        ? CacheManager.GetRegions()
+                        : new List<string>(1) { regionName };
 
-                    // Update the Cache size
-                    CurrentCacheSize = GetCacheSize();
-                    //if either policy or cache are stale, delete both
-                    if (File.GetLastAccessTime(policyPath) < minDate || File.GetLastAccessTime(cachePath) < minDate)
+                foreach (var region in regions)
+                {
+                    IEnumerable<string> keys = CacheManager.GetKeys(region);
+                    foreach (string key in keys)
                     {
-                        CurrentCacheSize -= CacheManager.DeleteFile(key, regionName);
+                        string policyPath = CacheManager.GetPolicyPath(key, region);
+                        string cachePath = CacheManager.GetCachePath(key, region);
+
+                        // Update the Cache size
+                        CurrentCacheSize = GetCacheSize();
+                        //if either policy or cache are stale, delete both
+                        if (File.GetLastAccessTime(policyPath) < minDate || File.GetLastAccessTime(cachePath) < minDate)
+                        {
+                            CurrentCacheSize -= CacheManager.DeleteFile(key, region);
+                        }
                     }
                 }
 
@@ -1003,10 +1027,12 @@ namespace System.Runtime.Caching
             public readonly DateTime LastAccessTime;
             public readonly long Length;
             public readonly string Key;
+            public readonly string Region;
 
-            public CacheItemReference(string key, string cachePath, string policyPath)
+            public CacheItemReference(string key, string region, string cachePath, string policyPath)
             {
                 Key = key;
+                Region = region;
                 FileInfo cfi = new FileInfo(cachePath);
                 FileInfo pfi = new FileInfo(policyPath);
                 cfi.Refresh();
@@ -1027,8 +1053,12 @@ namespace System.Runtime.Caching
                     // that way we delete smaller files first)
                     i = -1 * Length.CompareTo(other.Length);
                     if (i == 0)
-                    { 
-                        i = Key.CompareTo(other.Key);
+                    {
+                        i = string.Compare(Region, other.Region);
+                        if (i == 0)
+                        {
+                            i = Key.CompareTo(other.Key);
+                        }
                     }
                 }
 

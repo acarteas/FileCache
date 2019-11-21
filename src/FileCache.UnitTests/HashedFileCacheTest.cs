@@ -9,6 +9,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.Caching;
 using System.Threading;
 
@@ -165,12 +166,12 @@ namespace FC.UnitTests
             // Test empty case
             _cache.ShrinkCacheToSize(0).Should().Be(0);
 
-            // Insert 4 items, and keep track of their size
+            // Insert 4 items, one of them in a region, and keep track of their size
             //sleep to make sure that oldest item gets removed first
             _cache["item1"] = "bar1asdfasdfdfskjslkjlkjsdf sdlfkjasdlf asdlfkjskjfkjs d sdkfjksjd";
             Thread.Sleep(500);
             long size1 = _cache.GetCacheSize();
-            _cache["item2"] = "bar2sdfjkjk skdfj sdflkj sdlkj lkjkjkjkjkjssss";
+            _cache.Add("item2", "bar2sdfjkjk skdfj sdflkj sdlkj lkjkjkjkjkjssss", _cache.DefaultPolicy, "region");
             Thread.Sleep(500);
             long size2 = _cache.GetCacheSize() - size1;
             _cache["item3"] = "bar3ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
@@ -183,7 +184,7 @@ namespace FC.UnitTests
             long newSize = _cache.ShrinkCacheToSize(size4 + size3 + size2);
             newSize.Should().Be(size4 + size3 + size2);
 
-            // Shrink to just smaller than two items (should keep just item4, delete item2 and item3)
+            // Shrink to just smaller than two items (should keep just item4, delete item2 (in a region) and item3)
             newSize = _cache.ShrinkCacheToSize(size3 + size4 - 1);
             newSize.Should().Be(size4);
 
@@ -225,7 +226,8 @@ namespace FC.UnitTests
         {
             _cache = new FileCache("FlushTest");
 
-            _cache["foo"] = "bar";
+            _cache.Add("Key1", "Value1", _cache.DefaultPolicy);
+            _cache.Add("Key2", "Value2", DateTime.Now.AddDays(1), "Region1");
             Thread.Sleep(500);
 
             //attempt flush
@@ -235,6 +237,26 @@ namespace FC.UnitTests
 
             //check to see if size ends up at zero (expected result)
             _cache.GetCacheSize().Should().Be(0);
+        }
+
+        [TestMethod]
+        public void FlushRegionTest()
+        {
+            _cache = new FileCache("FlushRegionTest");
+
+            _cache.Add("Key1", "Value1", _cache.DefaultPolicy);
+            _cache.Add("Key2", "Value2", _cache.DefaultPolicy, "Region1");
+            Thread.Sleep(500);
+
+            //attempt flush
+            _cache.Flush("Region1");
+
+            Thread.Sleep(500);
+
+            object result = _cache["Key1"];
+            result.Should().Be("Value1");
+            object result2 = _cache.Get("Key2", "Region1");
+            result2.Should().BeNull();
         }
 
         [TestMethod]
@@ -291,8 +313,16 @@ namespace FC.UnitTests
         {
             _cache = new FileCache();
             _cache["MyFirstKey"] = "MyFirstValue";
+            _cache.Add("MySecondKey", "MySecondValue", _cache.DefaultPolicy, "MyFirstRegion");
             object pull = _cache.Get("MyFirstKey");
             pull.ToString().Should().Be("MyFirstValue");
+            object pull2 = _cache.Get("MySecondKey", "MyFirstRegion");
+            pull2.ToString().Should().Be("MySecondValue");
+            _cache.Clear();
+            object result = _cache.Get("MyFirstKey");
+            result.Should().BeNull();
+            object result2 = _cache.Get("MySecondKey", "MyFirstRegion");
+            result2.Should().BeNull();
         }
 
         /// <summary>
@@ -377,11 +407,24 @@ namespace FC.UnitTests
 
             _cache.Add("foo", 1, DateTime.Now); // expires immediately
             _cache.Add("bar", 2, DateTime.Now + TimeSpan.FromDays(1)); // set to expire tomorrow
+            _cache.Add("foo", 1, DateTime.Now, "region"); // expires immediately
+            _cache.Add("bar", 2, DateTime.Now + TimeSpan.FromDays(1), "region"); // set to expire tomorrow
+
+            var keys = _cache.GetKeys().ToList();
+            keys.Should().Contain("foo");
+            keys.Should().Contain("bar");
+            keys = _cache.GetKeys("region").ToList();
+            keys.Should().Contain("foo");
+            keys.Should().Contain("bar");
 
             _cache.CleanCache();
 
-            _cache["foo"].Should().BeNull();
-            _cache["bar"].Should().NotBeNull();
+            keys = _cache.GetKeys().ToList();
+            keys.Should().NotContain("foo");
+            keys.Should().Contain("bar");
+            keys = _cache.GetKeys("region").ToList();
+            keys.Should().NotContain("foo");
+            keys.Should().Contain("bar");
         }
     }
 }
