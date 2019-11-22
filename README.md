@@ -188,6 +188,12 @@ public string[] GetKeys(string regionName = null)
 public CacheItemPolicy GetPolicy(string key, string regionName = null)
 
 /// <summary>
+/// Returns a list of regions, including the root region.
+/// </summary>
+/// <returns></returns>
+public IEnumerable<string> GetRegions()
+
+/// <summary>
 /// Used to specify the disk size, in bytes, that can be used by the File Cache.
 /// Defaults to long.MaxValue
 /// </summary>
