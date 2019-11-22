@@ -3,8 +3,7 @@
     <TargetFrameworks>net40;net45;netstandard2.0</TargetFrameworks>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <PackageTags>cache objectcache System.Runtime.Caching.ObjectCache</PackageTags>
-    <PackageLicenseUrl>https://github.com/acarteas/FileCache/blob/master/LICENSE</PackageLicenseUrl>
-    <PackageProjectUrl>https://github.com/acarteas/FileCache</PackageProjectUrl>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <Authors>Adam Carter</Authors>
     <Description>FileCache is a concrete implementation of the .NET System.Runtime.Caching.ObjectCache that uses the local filesystem as the target location.</Description>
     <Copyright>Copyright (c) 2012, 2013, 2017 Adam Carter (http://adam-carter.com)</Copyright>
@@ -14,6 +13,16 @@
     <UpdateVersionProperties>true</UpdateVersionProperties>
     <Version>0.0.0</Version>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+
+    <DebugSymbols>True</DebugSymbols>
+    <DebugType>portable</DebugType>
+
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+
+    <!-- SourceLink Config, needs nuget package in each csproj Microsoft.SourceLink.GitHub in order to work -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\FileCache\BasicFileCacheManager.cs" Link="BasicFileCacheManager.cs" />
@@ -29,7 +38,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="GitVersionTask" Version="4.0.0-beta*">
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0-*" PrivateAssets="All" />
+    <PackageReference Include="GitVersionTask" Version="5.1.2">
       <PrivateAssets>All</PrivateAssets>
     </PackageReference>
   </ItemGroup>
