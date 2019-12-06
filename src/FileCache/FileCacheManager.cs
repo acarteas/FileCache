@@ -235,6 +235,24 @@ namespace System.Runtime.Caching
         public abstract IEnumerable<string> GetKeys(string regionName = null);
 
         /// <summary>
+        /// Returns a list of regions, including the root region.
+        /// </summary>
+        /// <returns></returns>
+        public IEnumerable<string> GetRegions()
+        {
+            string directory = Path.Combine(CacheDir, CacheSubFolder);
+            DirectoryInfo di = new DirectoryInfo(directory);
+            if (di.Exists)
+            {
+                yield return null;
+                foreach (var d in di.EnumerateDirectories())
+                {
+                    yield return d.Name;
+                }
+            }
+        }
+
+        /// <summary>
         /// Builds a string that will get the path to the supplied file's policy file
         /// </summary>
         /// <param name="key"></param>
