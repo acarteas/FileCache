@@ -275,6 +275,31 @@ namespace System.Runtime.Caching
             Init(DefaultCacheManager, calculateCacheSize, cleanInterval, false, false);
         }
 
+        /// <summary>
+        /// Creates an instance of the file cache.
+        /// </summary>
+        /// <param name="manager"></param>
+        /// <param name="cacheRoot">The cache's root file path</param>
+        /// <param name="binder">The SerializationBinder used to deserialize cached objects.  Needed if you plan
+        /// to cache custom objects.</param>
+        /// <param name="calculateCacheSize">If true, will calcualte the cache's current size upon new object creation.
+        /// Turned off by default as directory traversal is somewhat expensive and may not always be necessary based on
+        /// use case.
+        /// </param>
+        /// <param name="cleanInterval">If supplied, sets the interval of time that must occur between self cleans</param>
+        public FileCache(
+            FileCacheManagers manager,
+            string cacheRoot,
+            SerializationBinder binder,
+            bool calculateCacheSize = false,
+            TimeSpan cleanInterval = new TimeSpan()
+        )
+        {
+            _binder = binder;
+            CacheDir = cacheRoot;
+            Init(manager, calculateCacheSize, cleanInterval, false, false);
+        }
+
         #endregion
 
         #region custom methods
