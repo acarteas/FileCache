@@ -37,23 +37,17 @@ Task("Clean")
 Task("Restore-NuGet-Packages")
     .Does(() =>
 {
-    MSBuild(solutionFile, settings =>
-        settings
-            .WithTarget("Restore")
-            .SetConfiguration(configuration)
-            );
+    DotNetCoreRestore(solutionFile);
 });
 
 Task("Build")
     .IsDependentOn("Restore-NuGet-Packages")
     .Does(() =>
 {
-	// Use MSBuild for the Sln, but deploy
-	MSBuild(solutionFile, settings =>
-		settings
-            .WithTarget("Build")
-            .SetConfiguration(configuration)
-            );
+    DotNetCoreBuild(solutionFile, new DotNetCoreBuildSettings
+    {
+        Configuration = Argument("configuration", configuration)
+    });
 });
 
 Task("Test")
@@ -73,13 +67,11 @@ Task("Create-NuGet-Packages")
     .IsDependentOn("Build")
     .Does(() =>
 {
-    var settings = new MSBuildSettings()
-        .WithTarget("Pack")
-        .SetConfiguration(configuration)
-        .WithProperty("PackageOutputPath",artifactDirectory);
-
-    // Pack the Sln (unit tests has the <IsPackable> to false)
-    MSBuild(solutionFile, settings);
+    DotNetCorePack(solutionFile, new DotNetCorePackSettings
+    {
+        Configuration = configuration,
+        OutputDirectory = artifactDirectory
+    });
 });
 
 //////////////////////////////////////////////////////////////////////
