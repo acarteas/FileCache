@@ -875,7 +875,7 @@ namespace System.Runtime.Caching
                     if (payload.Policy.SlidingExpiration > new TimeSpan())
                     {
                         payload.Policy.AbsoluteExpiration = DateTime.Now.Add(payload.Policy.SlidingExpiration);
-                        WriteHelper(PayloadWriteMode, cachedItemPath, payload, regionName, true);
+                        WriteHelper(PayloadWriteMode, key, payload, regionName, true);
                     }
                     
                 }
