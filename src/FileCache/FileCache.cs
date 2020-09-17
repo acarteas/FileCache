@@ -341,6 +341,14 @@ namespace System.Runtime.Caching
                 _cleanInterval = cleanInterval;
             }
 
+            //set up cache manager
+            CacheManager = FileCacheManagerFactory.Create(manager);
+            CacheManager.CacheDir = CacheDir;
+            CacheManager.CacheSubFolder = _cacheSubFolder;
+            CacheManager.PolicySubFolder = _policySubFolder;
+            CacheManager.Binder = _binder;
+            CacheManager.AccessTimeout = new TimeSpan();
+
             //check to see if cache is in need of immediate cleaning
             if (ShouldClean())
             {
@@ -352,14 +360,6 @@ namespace System.Runtime.Caching
                 // update the cache size, so no need to do it twice.
                 UpdateCacheSizeAsync();
             }
-
-            //set up cache manager
-            CacheManager = FileCacheManagerFactory.Create(manager);
-            CacheManager.CacheDir = CacheDir;
-            CacheManager.CacheSubFolder = _cacheSubFolder;
-            CacheManager.PolicySubFolder = _policySubFolder;
-            CacheManager.Binder = _binder;
-            CacheManager.AccessTimeout = new TimeSpan();
 
             MaxCacheSizeReached += FileCache_MaxCacheSizeReached;
         }
