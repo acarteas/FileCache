@@ -357,7 +357,7 @@ namespace FC.UnitTests
             _cache = new FileCache();
             _cache.AccessTimeout = new TimeSpan(1);
             _cache["primer"] = 0;
-            string filePath = Path.Combine(_cache.CacheDir, "cache", "primer".GetHashCode() + "_0.dat");
+            string filePath = Path.Combine(_cache.CacheDir, "cache", HashedFileCacheManager.ComputeHash("primer") + "_0.dat");
             FileStream stream = File.Open(filePath, FileMode.Create);
             try
             {
