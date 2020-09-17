@@ -45,12 +45,11 @@ or when accessing FC cache values from outside of FC.  However, it also has the
 downside of not supporting cache key names that cannot be used in file names (e.g. /).
 
 Rather than using key names as file names, the Hashed scheme, introduced in Version 3.0, 
-uses hashed representations of key names using the built-in .NET function 
-```GetHashCode()```.  This function produces a numeric representation of each key that is 
-guaranteed to produce a valid file name.  However, the downside of this approach is 
-that ```GetHashCode()``` is not guaranteed to produce a unique key.  Therefore, FC must 
-account for collisions when using the Hashed scheme.  This slight overhead is likely to 
-correspond in slighly higher cache retrieval times.  
+uses hashed representations of key names using [xxHash][4].  
+This function produces a numeric representation of each key that is guaranteed to produce 
+a valid file name.  However, the downside of this approach is that xxHash is not guaranteed to 
+produce a unique key.  Therefore, FC must account for collisions when using the Hashed 
+scheme.  This slight overhead is likely to correspond in slighly higher cache retrieval times.  
 
 For now, the default caching scheme is set to `Basic` in order to maintain compatibility with
 prior releases.  Furthermore, while the `Hashed` scheme passes all unit tests, *_it should 
@@ -236,3 +235,4 @@ public void Flush(DateTime minDate, string regionName = null);
   [1]: https://www.nuget.org/packages/FileCache.Signed
   [2]: https://www.nuget.org/packages/FileCache
   [3]: http://msdn.microsoft.com/en-us/library/system.runtime.caching.objectcache.aspx
+  [4]: https://github.com/brandondahler/Data.HashFunction/
