@@ -1,18 +1,28 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Runtime.Serialization;
-using System.Text;
-
+using System.Data.HashFunction;
+using System.Data.HashFunction.xxHash;
 namespace System.Runtime.Caching
 {
     /// <summary>
-    /// File-based caching using the built-in .NET GetHashCode().  Collisions are handled by appending
+    /// File-based caching using xxHash.  Collisions are handled by appending
     /// numerically ascending identifiers to each hash key (e.g. _1, _2, etc.).
     /// </summary>
     public class HashedFileCacheManager : FileCacheManager
     {
+        private static IxxHash _hasher = xxHashFactory.Instance.Create();
+        /// <summary>
+        /// Returns a 64bit hash in hex of supplied key
+        /// </summary>
+        /// <param name="key"></param>
+        /// <returns></returns>
+        public static string ComputeHash(string key)
+        {
+            var hash = _hasher.ComputeHash(key, 64);
+            return hash.AsHexString();
+        }
+
         /// <summary>
         /// Because hash collisions prevent us from knowing the exact file name of the supplied key, we need to probe through
         /// all possible fine name combinations.  This function is used internally by the Delete and Get functions in this class.
@@ -32,7 +42,7 @@ namespace System.Runtime.Caching
             //the policy.  It also means that deleting a policy file makes the related .dat "invisible" to FC.
             string directory = Path.Combine(CacheDir, PolicySubFolder, regionName);
 
-            string hash = key.GetHashCode().ToString();
+            string hash = ComputeHash(key);
             int hashCounter = 0;
             string fileName = Path.Combine(directory, string.Format("{0}_{1}.policy", hash, hashCounter));
             bool found = false;
