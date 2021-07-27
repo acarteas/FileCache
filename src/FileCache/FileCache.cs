@@ -31,7 +31,6 @@ namespace System.Runtime.Caching
         // this is a file used to prevent multiple processes from trying to "clean" at the same time
         private const string SemaphoreFile = "cache.sem";
         private long _currentCacheSize = 0;
-        private PayloadMode _readMode = PayloadMode.Serializable;
         public string CacheDir { get; protected set; }
 
         /// <summary>
@@ -88,16 +87,7 @@ namespace System.Runtime.Caching
         /// <summary>
         /// Specified whether the payload is deserialized or just the file name.
         /// </summary>
-        public PayloadMode PayloadReadMode {
-            get => _readMode;
-            set {
-                if (value == PayloadMode.RawBytes)
-                {
-                    throw new ArgumentException("The read mode cannot be set to RawBytes. Use the file name please.");
-                }
-                _readMode = value;
-            }
-        }
+        public PayloadMode PayloadReadMode { get; set; } = PayloadMode.Serializable;
 
         /// <summary>
         /// Specified how the payload is to be handled on add operations.
@@ -144,12 +134,11 @@ namespace System.Runtime.Caching
                 if (_currentCacheSize == 0)
                 {
                     // Read the system file for cache size
-                    object cacheSizeObj = CacheManager.ReadSysFile(CacheSizeFile);
-
-                    // Did we successfully get data from the file?
-                    if (cacheSizeObj != null)
+                    long cacheSize;
+                    if (CacheManager.ReadSysValue(CacheSizeFile, out cacheSize))
                     {
-                        _currentCacheSize = (long) cacheSizeObj;
+                        // Did we successfully get data from the file? Write it to our member var.
+                        _currentCacheSize = cacheSize;
                     }
                 }
 
@@ -160,7 +149,7 @@ namespace System.Runtime.Caching
                 // no need to do a pointless re-store of the same value
                 if (_currentCacheSize != value || value == 0)
                 {
-                    CacheManager.WriteSysFile(CacheSizeFile, value);
+                    CacheManager.WriteSysValue(CacheSizeFile, value);
                     _currentCacheSize = value;
                 }
             }
@@ -395,11 +384,10 @@ namespace System.Runtime.Caching
             try
             {
                 // if the file can't be found, or is corrupt this will throw an exception
-                DateTime? lastClean = CacheManager.ReadSysFile(LastCleanedDateFile) as DateTime?;
-
-                //AC: rewrote to be safer in null cases
-                if (lastClean == null)
+                DateTime lastClean;
+                if (!CacheManager.ReadSysValue(LastCleanedDateFile, out lastClean))
                 {
+                    //AC: rewrote to be safer in cases where no value obtained.
                     return true;
                 }
 
@@ -514,7 +502,7 @@ namespace System.Runtime.Caching
                 }
 
                 // mark that we've cleaned the cache
-                CacheManager.WriteSysFile(LastCleanedDateFile, DateTime.Now);
+                CacheManager.WriteSysValue(LastCleanedDateFile, DateTime.Now);
 
                 // unlock
                 cLock.Close();

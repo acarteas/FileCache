@@ -12,6 +12,11 @@ namespace System.Runtime.Caching
 {
     public abstract class FileCacheManager
     {
+        // Magic version for new sysfiles: 3.3.0 packed into a long.
+        protected const ulong CACHE_VERSION = (  3 << 16
+                                               + 3 <<  8
+                                               + 0 <<  0);
+
         public string CacheDir { get; set; }
         public string CacheSubFolder { get; set; }
         public string PolicySubFolder { get; set; }
@@ -23,6 +28,40 @@ namespace System.Runtime.Caching
         /// reached, an exception will be thrown.
         /// </summary>
         public TimeSpan AccessTimeout { get; set; }
+
+
+        /// <summary>
+        /// Differentiate outdated cache formats from newer.
+        ///
+        /// Older caches use "BinaryFormatter", which is a security risk:
+        /// https://docs.microsoft.com/nl-nl/dotnet/standard/serialization/binaryformatter-security-guide#preferred-alternatives
+        ///
+        /// The newer caches have a 'magic' header we'll look for.
+        /// </summary>
+        /// <param name="reader">BinaryReader opened to stream containing the file contents.</param>
+        /// <returns>boolean indicating validity</returns>
+        protected bool HeaderVersionValid(BinaryReader reader)
+        {
+            // Don't much care about exceptions here - let them bubble up.
+            ulong version = reader.ReadUInt64();
+            // Valid if magic header version matches.
+            return (version == CACHE_VERSION);
+        }
+
+        /// <summary>
+        /// Differentiate outdated cache formats from newer.
+        ///
+        /// Older caches use "BinaryFormatter", which is a security risk:
+        /// https://docs.microsoft.com/nl-nl/dotnet/standard/serialization/binaryformatter-security-guide#preferred-alternatives
+        ///
+        /// The newer caches have a 'magic' header we'll look for.
+        /// </summary>
+        /// <param name="reader">BinaryWriter opened to stream that will contain the file contents.</param>
+        protected void HeaderVersionWrite(BinaryWriter writer)
+        {
+            // Don't much care about exceptions here - let them bubble up.
+            writer.Write(CACHE_VERSION);
+        }
 
         protected virtual object DeserializePayloadData(string fileName, SerializationBinder objectBinder = null)
         {
@@ -98,9 +137,30 @@ namespace System.Runtime.Caching
             return payload;
         }
 
-        private object LoadRawPayloadData(string cachePath)
+        private byte[] LoadRawPayloadData(string fileName)
         {
-            throw new NotSupportedException("Reading raw payload is not currently supported.");
+            byte[] data = null;
+            if (File.Exists(fileName))
+            {
+                using (FileStream stream = GetStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read))
+                {
+                    using (BinaryReader reader = new BinaryReader(stream))
+                    {
+                        // Check if it's valid version first.
+                        if (!HeaderVersionValid(reader))
+                        {
+                            // Failure - return invalid data.
+                            return null;
+
+                            // `using` statements will clean up for us.
+                        }
+
+                        // Valid - read entire file.
+                        data = reader.ReadBytes(int.MaxValue);
+                    }
+                }
+            }
+            return data;
         }
 
         protected virtual object Deserialize(string fileName, SerializationBinder objectBinder = null)
@@ -165,7 +225,6 @@ namespace System.Runtime.Caching
                     case FileCache.PayloadMode.Serializable:
                         using (FileStream stream = GetStream(cachedItemPath, FileMode.Create, FileAccess.Write, FileShare.None))
                         {
-
                             BinaryFormatter formatter = new BinaryFormatter();
                             formatter.Serialize(stream, data.Payload);
                         }
@@ -173,17 +232,20 @@ namespace System.Runtime.Caching
                     case FileCache.PayloadMode.RawBytes:
                         using (FileStream stream = GetStream(cachedItemPath, FileMode.Create, FileAccess.Write, FileShare.None))
                         {
-
-                            if (data.Payload is byte[])
+                            using (BinaryWriter writer = new BinaryWriter(stream))
                             {
-                                byte[] dataPayload = (byte[])data.Payload;
-                                stream.Write(dataPayload, 0, dataPayload.Length);
-                            }
-                            else if (data.Payload is Stream)
-                            {
-                                Stream dataPayload = (Stream)data.Payload;
-                                dataPayload.CopyTo(stream);
-                                // no close or the like, we are not the owner
+                                if (data.Payload is byte[])
+                                {
+                                    byte[] dataPayload = (byte[])data.Payload;
+                                    writer.Write(dataPayload);
+                                }
+                                else if (data.Payload is Stream)
+                                {
+                                    Stream dataPayload = (Stream)data.Payload;
+                                    byte[] bytePayload = new byte[dataPayload.Length - dataPayload.Position];
+                                    dataPayload.Read(bytePayload, (int)dataPayload.Position, bytePayload.Length);
+                                    // no close or the like for data.Payload - we are not the owner
+                                }
                             }
                         }
                         break;
@@ -261,17 +323,56 @@ namespace System.Runtime.Caching
         public abstract string GetPolicyPath(string key, string regionName = null);
 
         /// <summary>
-        /// Reads data in from a system file. System files are not part of the
-        /// cache itself, but serve as a way for the cache to store data it
-        /// needs to operate.
+        /// Generic version of ReadSysValue just throws an ArgumentException to error on unknown new types.
         /// </summary>
         /// <param name="filename">The name of the sysfile (without directory)</param>
-        /// <returns>The data from the file</returns>
-        public object ReadSysFile(string filename)
+        /// <param name="value">The value read</param>
+        /// <returns>success/failure boolean</returns>
+        public bool ReadSysValue<T>(string filename, out T value) where T : struct
         {
+            throw new ArgumentException(string.Format("Type is currently unsupported: {0}", typeof(T).ToString()), "value");
+
+            // These types could be easily implemented following the `long` function as a template:
+            //   - bool:
+            //     + reader.ReadBoolean();
+            //   - byte:
+            //     + reader.ReadByte();
+            //   - char:
+            //     + reader.ReadChar();
+            //   - decimal:
+            //     + reader.ReadDecimal();
+            //   - double:
+            //     + reader.ReadDouble();
+            //   - short:
+            //     + reader.ReadInt16();
+            //   - int:
+            //     + reader.ReadInt32();
+            //   - long:
+            //     + reader.ReadInt64();
+            //   - sbyte:
+            //     + reader.ReadSbyte();
+            //   - ushort:
+            //     + reader.ReadUInt16();
+            //   - uint:
+            //     + reader.ReadUInt32();
+            //   - ulong:
+            //     + reader.ReadUInt64();
+        }
+
+        /// <summary>
+        /// Read a `long` (64 bit signed int) from a sysfile.
+        /// </summary>
+        /// <param name="filename">The name of the sysfile (without directory)</param>
+        /// <param name="value">The value read or long.MinValue</param>
+        /// <returns>success/failure boolean</returns>
+        public bool ReadSysValue(string filename, out long value)
+        {
+            // Return min value on fail. Success/fail will be either exception or bool return.
+            value = long.MinValue;
+            bool success = false;
+
             // sys files go in the root directory
             string path = Path.Combine(CacheDir, filename);
-            object data = null;
 
             if (File.Exists(path))
             {
@@ -281,21 +382,33 @@ namespace System.Runtime.Caching
                     {
                         using (FileStream stream = GetStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
                         {
-                            BinaryFormatter formatter = new BinaryFormatter();
-                            try
+                            using(BinaryReader reader = new BinaryReader(stream))
                             {
-                                data = formatter.Deserialize(stream);
+                                try
+                                {
+                                    // The old "BinaryFormatter" sysfiles will fail this check.
+                                    if (HeaderVersionValid(reader))
+                                    {
+                                        value = reader.ReadInt64();
+                                    }
+                                    else
+                                    {
+                                        // Invalid version - return invalid value & failure.
+                                        value = long.MinValue;
+                                        success = false;
+                                        break;
+                                    }
+                                }
+                                catch (Exception)
+                                {
+                                    value = long.MinValue;
+                                    // DriveCommerce: Need to rethrow to get the IOException caught.
+                                    throw;
+                                }
                             }
-                            catch (Exception)
-                            {
-                                data = null;
-                            }
-                            finally
-                            {
-                                stream.Close();
-                            }
+                            success = true;
+                            break;
                         }
-                        break;
                     }
                     catch (IOException)
                     {
@@ -304,16 +417,47 @@ namespace System.Runtime.Caching
                 }
             }
 
-            return data;
+            // `value` already set correctly.
+            return success;
         }
 
         /// <summary>
-        /// Writes data to a system file that is not part of the cache itself,
+        /// Read a `DateTime` struct from a sysfile using `DateTime.FromBinary()`.
+        /// </summary>
+        /// <param name="filename">The name of the sysfile (without directory)</param>
+        /// <param name="value">The value read or DateTime.MinValue</param>
+        /// <returns>success/failure boolean</returns>
+        public bool ReadSysValue(string filename, out DateTime value)
+        {
+            // DateTime is serialized as a long, so use that `ReadSysValue()` function.
+            long serialized;
+            if (ReadSysValue(filename, out serialized))
+            {
+                value = DateTime.FromBinary(serialized);
+                return true;
+            }
+            // else failed:
+            value = DateTime.MinValue;
+            return false;
+        }
+
+        /// <summary>
+        /// Generic version of `WriteSysValue` just throws an ArgumentException on unknown new types.
+        /// </summary>
+        /// <param name="filename">The name of the sysfile (without directory)</param>
+        /// <param name="data">The data to write to the sysfile</param>
+        public void WriteSysValue<T>(string filename, T data) where T : struct
+        {
+            throw new ArgumentException(string.Format("Type is currently unsupported: {0}", typeof(T).ToString()), "data");
+        }
+
+        /// <summary>
+        /// Writes a long to a system file that is not part of the cache itself,
         /// but is used to help it function.
         /// </summary>
         /// <param name="filename">The name of the sysfile (without directory)</param>
-        /// <param name="data">The data to write to the file</param>
-        public void WriteSysFile(string filename, object data)
+        /// <param name="data">The long to write to the file</param>
+        public void WriteSysValue(string filename, long data)
         {
             // sys files go in the root directory
             string path = Path.Combine(CacheDir, filename);
@@ -321,9 +465,13 @@ namespace System.Runtime.Caching
             // write the data to the file
             using (FileStream stream = GetStream(path, FileMode.Create, FileAccess.Write, FileShare.Write))
             {
-                BinaryFormatter formatter = new BinaryFormatter();
-                formatter.Serialize(stream, data);
-                stream.Close();
+                using (BinaryWriter writer = new BinaryWriter(stream))
+                {
+                    // Must write the magic version header first.
+                    HeaderVersionWrite(writer);
+
+                    writer.Write(data);
+                }
             }
         }
 
