@@ -14,8 +14,8 @@ namespace System.Runtime.Caching
     {
         // Magic version for new sysfiles: 3.3.0 packed into a long.
         protected const ulong CACHE_VERSION = (  3 << 16
-                                               + 3 <<  8
-                                               + 0 <<  0);
+                                                 + 3 <<  8
+                                                 + 0 <<  0);
 
         public string CacheDir { get; set; }
         public string CacheSubFolder { get; set; }
@@ -127,8 +127,21 @@ namespace System.Runtime.Caching
             }
             try
             {
-                // TODO: In part of the merge it looked like the policy was force serialized with LocalCacheBinder(), is this intended?
-                payload.Policy = Deserialize(policyPath) as SerializableCacheItemPolicy;
+                if (File.Exists(policyPath))
+                {
+                    using (FileStream stream = GetStream(policyPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                    {
+                        using (BinaryReader reader = new BinaryReader(stream))
+                        {
+                            // TODO: In part of the merge it looked like the policy was force serialized with LocalCacheBinder(), is this intended?
+                            payload.Policy = SerializableCacheItemPolicy.Deserialize(reader, stream.Length);
+                        }
+                    }
+                }
+                else
+                {
+                    payload.Policy = new SerializableCacheItemPolicy();
+                }
             }
             catch
             {
@@ -268,13 +281,13 @@ namespace System.Runtime.Caching
             //write the cache policy
             using (FileStream stream = GetStream(cachedPolicy, FileMode.Create, FileAccess.Write, FileShare.None))
             {
-                BinaryFormatter formatter = new BinaryFormatter();
-                formatter.Serialize(stream, data.Policy);
+                using (BinaryWriter writer = new BinaryWriter(stream))
+                {
+                    data.Policy.Serialize(writer);
 
-                // adjust cache size
-                cacheSizeDelta += new FileInfo(cachedPolicy).Length;
-
-                stream.Close();
+                    // adjust cache size
+                    cacheSizeDelta += new FileInfo(cachedPolicy).Length;
+                }
             }
 
             return cacheSizeDelta;
@@ -555,7 +568,7 @@ namespace System.Runtime.Caching
 
                 // Get the type using the typeName and assemblyName
                 typeToDeserialize = Type.GetType(String.Format("{0}, {1}",
-                    typeName, assemblyName));
+                                                               typeName, assemblyName));
 
                 return typeToDeserialize;
             }
