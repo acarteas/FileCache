@@ -23,8 +23,8 @@ namespace System.Runtime.Caching
         /// <summary>
         /// Default constructor.
         /// </summary>
-        /// <param name="comparer">The comparer to use.  The default comparer will make the smallest item the root of the heap.  
-        /// 
+        /// <param name="comparer">The comparer to use.  The default comparer will make the smallest item the root of the heap.
+        ///
         /// </param>
         public PriortyQueue(IComparer<T> comparer = null)
         {

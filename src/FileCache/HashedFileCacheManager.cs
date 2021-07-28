@@ -85,7 +85,7 @@ namespace System.Runtime.Caching
         }
 
         /// <summary>
-        /// Builds a string that will place the specified file name within the appropriate 
+        /// Builds a string that will place the specified file name within the appropriate
         /// cache and workspace folder.
         /// </summary>
         /// <param name="key"></param>
@@ -106,7 +106,7 @@ namespace System.Runtime.Caching
         }
 
         /// <summary>
-        /// Returns a list of keys for a given region.  
+        /// Returns a list of keys for a given region.
         /// </summary>
         /// <param name="regionName"></param>
         public override IEnumerable<string> GetKeys(string regionName = null)

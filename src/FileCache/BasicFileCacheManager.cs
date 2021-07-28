@@ -11,7 +11,7 @@ namespace System.Runtime.Caching
     public class BasicFileCacheManager : FileCacheManager
     {
         /// <summary>
-        /// Returns a list of keys for a given region.  
+        /// Returns a list of keys for a given region.
         /// </summary>
         /// <param name="regionName"></param>
         /// <returns></returns>
@@ -33,7 +33,7 @@ namespace System.Runtime.Caching
         }
 
         /// <summary>
-        /// Builds a string that will place the specified file name within the appropriate 
+        /// Builds a string that will place the specified file name within the appropriate
         /// cache and workspace folder.
         /// </summary>
         /// <param name="FileName"></param>

@@ -18,7 +18,7 @@ namespace System.Runtime.Caching
         public SerializationBinder Binder { get; set; }
 
         /// <summary>
-        /// Used to determine how long the FileCache will wait for a file to become 
+        /// Used to determine how long the FileCache will wait for a file to become
         /// available.  Default (00:00:00) is indefinite.  Should the timeout be
         /// reached, an exception will be thrown.
         /// </summary>
@@ -219,16 +219,16 @@ namespace System.Runtime.Caching
         }
 
         /// <summary>
-        /// Builds a string that will place the specified file name within the appropriate 
+        /// Builds a string that will place the specified file name within the appropriate
         /// cache and workspace folder.
         /// </summary>
         /// <param name="key"></param>
         /// <param name="regionName"></param>
         /// <returns></returns>
         public abstract string GetCachePath(string key, string regionName = null);
-        
+
         /// <summary>
-        /// Returns a list of keys for a given region.  
+        /// Returns a list of keys for a given region.
         /// </summary>
         /// <param name="regionName"></param>
         /// <returns></returns>
@@ -262,7 +262,7 @@ namespace System.Runtime.Caching
 
         /// <summary>
         /// Reads data in from a system file. System files are not part of the
-        /// cache itself, but serve as a way for the cache to store data it 
+        /// cache itself, but serve as a way for the cache to store data it
         /// needs to operate.
         /// </summary>
         /// <param name="filename">The name of the sysfile (without directory)</param>
@@ -390,7 +390,7 @@ namespace System.Runtime.Caching
             }
             catch (IOException ex)
             {
-                //Owning FC might be interested in this exception.  
+                //Owning FC might be interested in this exception.
                 throw ex;
             }
             return Math.Abs(bytesFreed);
