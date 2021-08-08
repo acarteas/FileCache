@@ -1,10 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.Text;
 
 namespace System.Runtime.Caching
 {
@@ -17,12 +12,7 @@ namespace System.Runtime.Caching
         /// <returns></returns>
         public override IEnumerable<string> GetKeys(string regionName = null)
         {
-            string region = "";
-            if (string.IsNullOrEmpty(regionName) == false)
-            {
-                region = regionName;
-            }
-            string directory = Path.Combine(CacheDir, CacheSubFolder, region);
+            string directory = Path.Combine(CacheDir, CacheSubFolder, regionName ?? string.Empty);
             if (Directory.Exists(directory))
             {
                 foreach (string file in Directory.EnumerateFiles(directory))
@@ -41,17 +31,8 @@ namespace System.Runtime.Caching
         /// <returns></returns>
         public override string GetCachePath(string FileName, string regionName = null)
         {
-            if (regionName == null)
-            {
-                regionName = "";
-            }
-            string directory = Path.Combine(CacheDir, CacheSubFolder, regionName);
-            string filePath = Path.Combine(directory, Path.GetFileNameWithoutExtension(FileName) + ".dat");
-            if (!Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-            return filePath;
+            string directory = Path.Combine(CacheDir, CacheSubFolder, regionName ?? string.Empty);
+            return GetOrCreateFilePath(directory, FileName, ".dat");
         }
 
         /// <summary>
@@ -62,19 +43,26 @@ namespace System.Runtime.Caching
         /// <returns></returns>
         public override string GetPolicyPath(string key, string regionName = null)
         {
-            if (regionName == null)
-            {
-                regionName = "";
-            }
-            string directory = Path.Combine(CacheDir, PolicySubFolder, regionName);
-            string filePath = Path.Combine(directory, Path.GetFileNameWithoutExtension(key) + ".policy");
+            string directory = Path.Combine(CacheDir, PolicySubFolder, regionName ?? string.Empty);
+            return GetOrCreateFilePath(directory, key, ".policy");
+        }
+
+        /// <summary>
+        /// Builds a file name and ensures that the containing directory exists.
+        /// </summary>
+        /// <param name="directory"></param>
+        /// <param name="fileName"></param>
+        /// <param name="extension"></param>
+        /// <returns></returns>
+        private string GetOrCreateFilePath(string directory, string fileName, string extension)
+        {
+            string filePath = Path.Combine(directory, Path.GetFileNameWithoutExtension(fileName) + extension);
             if (!Directory.Exists(directory))
             {
                 Directory.CreateDirectory(directory);
             }
+
             return filePath;
         }
-
-
     }
 }

@@ -30,6 +30,7 @@ namespace System.Runtime.Caching
                 }
             }
         }
+
         public SerializableCacheItemPolicy(CacheItemPolicy policy)
         {
             AbsoluteExpiration = policy.AbsoluteExpiration;
