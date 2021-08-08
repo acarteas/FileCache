@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Data.HashFunction;
 using System.Data.HashFunction.xxHash;
@@ -40,21 +39,24 @@ namespace System.Runtime.Caching
             //CacheItemPolicies have references to the original key, which is why we look there.  This implies that
             //manually deleting a policy in the file system has dire implications for any keys that probe after
             //the policy.  It also means that deleting a policy file makes the related .dat "invisible" to FC.
-            string directory = Path.Combine(CacheDir, PolicySubFolder, regionName);
+            string directory = GetPolicyRegionFolder(regionName);
 
             string hash = ComputeHash(key);
             int hashCounter = 0;
-            string fileName = Path.Combine(directory, string.Format("{0}_{1}.policy", hash, hashCounter));
+
+            string GetPolicyFile() => Path.Combine(directory, $"{hash}_{hashCounter}.policy");
+
+            string fileName = GetPolicyFile();
             bool found = false;
             while (found == false)
             {
-                fileName = Path.Combine(directory, string.Format("{0}_{1}.policy", hash, hashCounter));
+                fileName = GetPolicyFile();
                 if (File.Exists(fileName) == true)
                 {
                     //check for correct key
                     try
                     {
-                        SerializableCacheItemPolicy policy = Deserialize(fileName) as SerializableCacheItemPolicy;
+                        SerializableCacheItemPolicy policy = DeserializeCacheItemPolicy(fileName);
                         if (key.CompareTo(policy.Key) == 0)
                         {
                             //correct key found!
@@ -71,14 +73,12 @@ namespace System.Runtime.Caching
                         //Corrupt file?  Assume usable for current key.
                         found = true;
                     }
-
                 }
                 else
                 {
                     //key not found, must not exist.  Return last generated file name.
                     found = true;
                 }
-
             }
 
             return Path.GetFileNameWithoutExtension(fileName);
@@ -96,12 +96,14 @@ namespace System.Runtime.Caching
             {
                 regionName = "";
             }
+
             string directory = Path.Combine(CacheDir, CacheSubFolder, regionName);
             string filePath = Path.Combine(directory, GetFileName(key, regionName) + ".dat");
             if (!Directory.Exists(directory))
             {
                 Directory.CreateDirectory(directory);
             }
+
             return filePath;
         }
 
@@ -116,6 +118,7 @@ namespace System.Runtime.Caching
             {
                 region = regionName;
             }
+
             string directory = Path.Combine(CacheDir, PolicySubFolder, region);
             List<string> keys = new List<string>();
             if (Directory.Exists(directory))
@@ -124,7 +127,7 @@ namespace System.Runtime.Caching
                 {
                     try
                     {
-                        SerializableCacheItemPolicy policy = Deserialize(file) as SerializableCacheItemPolicy;
+                        SerializableCacheItemPolicy policy = DeserializeCacheItemPolicy(file);
                         keys.Add(policy.Key);
                     }
                     catch
@@ -133,6 +136,7 @@ namespace System.Runtime.Caching
                     }
                 }
             }
+
             return keys.ToArray();
         }
 
@@ -148,13 +152,20 @@ namespace System.Runtime.Caching
             {
                 regionName = "";
             }
-            string directory = Path.Combine(CacheDir, PolicySubFolder, regionName);
+
+            string directory = GetPolicyRegionFolder(regionName);
             string filePath = Path.Combine(directory, GetFileName(key, regionName) + ".policy");
             if (!Directory.Exists(directory))
             {
                 Directory.CreateDirectory(directory);
             }
+
             return filePath;
+        }
+
+        private string GetPolicyRegionFolder(string regionName)
+        {
+            return Path.Combine(CacheDir, PolicySubFolder, regionName);
         }
     }
 }

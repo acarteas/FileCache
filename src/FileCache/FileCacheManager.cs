@@ -1,11 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Reflection;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
-using System.Text;
 using System.Threading;
 
 namespace System.Runtime.Caching
@@ -29,7 +25,7 @@ namespace System.Runtime.Caching
             object data = null;
             if (File.Exists(fileName))
             {
-                using (FileStream stream = GetStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read))
+                using (var stream = OpenRead(fileName))
                 {
                     BinaryFormatter formatter = new BinaryFormatter();
 
@@ -58,6 +54,11 @@ namespace System.Runtime.Caching
             return data;
         }
 
+        private FileStream OpenRead(string fileName)
+        {
+            return GetStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read);
+        }
+
         /// <summary>
         /// This function serves to centralize file reads within this class.
         /// </summary>
@@ -72,7 +73,7 @@ namespace System.Runtime.Caching
             string cachePath = GetCachePath(key, regionName);
             string policyPath = GetPolicyPath(key, regionName);
             FileCachePayload payload = new FileCachePayload(null);
-            switch(mode)
+            switch (mode)
             {
                 case FileCache.PayloadMode.Filename:
                     payload.Payload = cachePath;
@@ -86,15 +87,17 @@ namespace System.Runtime.Caching
                 default:
                     throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
             }
+
             try
             {
                 // TODO: In part of the merge it looked like the policy was force serialized with LocalCacheBinder(), is this intended?
-                payload.Policy = Deserialize(policyPath) as SerializableCacheItemPolicy;
+                payload.Policy = DeserializeCacheItemPolicy(policyPath);
             }
             catch
             {
                 payload.Policy = new SerializableCacheItemPolicy();
             }
+
             return payload;
         }
 
@@ -103,12 +106,17 @@ namespace System.Runtime.Caching
             throw new NotSupportedException("Reading raw payload is not currently supported.");
         }
 
+        protected SerializableCacheItemPolicy DeserializeCacheItemPolicy(string path)
+        {
+            return (SerializableCacheItemPolicy)Deserialize(path);
+        }
+
         protected virtual object Deserialize(string fileName, SerializationBinder objectBinder = null)
         {
             object data = null;
             if (File.Exists(fileName))
             {
-                using (FileStream stream = GetStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read))
+                using (var stream = OpenRead(fileName))
                 {
                     BinaryFormatter formatter = new BinaryFormatter();
 
@@ -137,6 +145,7 @@ namespace System.Runtime.Caching
                     }
                 }
             }
+
             return data;
         }
 
@@ -165,7 +174,6 @@ namespace System.Runtime.Caching
                     case FileCache.PayloadMode.Serializable:
                         using (FileStream stream = GetStream(cachedItemPath, FileMode.Create, FileAccess.Write, FileShare.None))
                         {
-
                             BinaryFormatter formatter = new BinaryFormatter();
                             formatter.Serialize(stream, data.Payload);
                         }
@@ -173,7 +181,6 @@ namespace System.Runtime.Caching
                     case FileCache.PayloadMode.RawBytes:
                         using (FileStream stream = GetStream(cachedItemPath, FileMode.Create, FileAccess.Write, FileShare.None))
                         {
-
                             if (data.Payload is byte[])
                             {
                                 byte[] dataPayload = (byte[])data.Payload;
@@ -393,24 +400,8 @@ namespace System.Runtime.Caching
                 //Owning FC might be interested in this exception.  
                 throw ex;
             }
+
             return Math.Abs(bytesFreed);
-        }
-
-        protected class LocalCacheBinder : System.Runtime.Serialization.SerializationBinder
-        {
-            public override Type BindToType(string assemblyName, string typeName)
-            {
-                Type typeToDeserialize = null;
-
-                String currentAssembly = Assembly.GetAssembly(typeof(LocalCacheBinder)).FullName;
-                assemblyName = currentAssembly;
-
-                // Get the type using the typeName and assemblyName
-                typeToDeserialize = Type.GetType(String.Format("{0}, {1}",
-                    typeName, assemblyName));
-
-                return typeToDeserialize;
-            }
         }
     }
 }

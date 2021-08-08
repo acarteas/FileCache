@@ -8,10 +8,7 @@ Consult "LICENSE.txt" included in this package for the Apache License 2.0.
 */
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Reflection;
 using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -72,7 +69,7 @@ namespace System.Runtime.Caching
         public enum PayloadMode
         {
             /// <summary>
-            /// Treat the payload a a serializable object.
+            /// Treat the payload as a serializable object.
             /// </summary>
             Serializable,
             /// <summary>
@@ -192,21 +189,20 @@ namespace System.Runtime.Caching
         /// <param name="manager"></param>
         public FileCache(FileCacheManagers manager)
         {
-            Init(manager, false, new TimeSpan(), true, true);
+            Init(manager, false, TimeSpan.Zero, true, true);
         }
 
         /// <summary>
         /// Creates a default instance of the file cache.  Don't use if you plan to serialize custom objects
         /// </summary>
-        /// <param name="calculateCacheSize">If true, will calcualte the cache's current size upon new object creation.
+        /// <param name="calculateCacheSize">If true, will calculate the cache's current size upon new object creation.
         /// Turned off by default as directory traversal is somewhat expensive and may not always be necessary based on
         /// use case.
         /// </param>
         /// <param name="cleanInterval">If supplied, sets the interval of time that must occur between self cleans</param>
         public FileCache(
             bool calculateCacheSize = false,
-            TimeSpan cleanInterval = new TimeSpan()
-            )
+            TimeSpan cleanInterval = new TimeSpan())
         {
             // CT note: I moved this code to an init method because if the user specified a cache root, that needs to
             // be set before checking if we should clean (otherwise it will look for the file in the wrong place)
@@ -217,7 +213,7 @@ namespace System.Runtime.Caching
         /// Creates an instance of the file cache using the supplied path as the root save path.
         /// </summary>
         /// <param name="cacheRoot">The cache's root file path</param>
-        /// <param name="calculateCacheSize">If true, will calcualte the cache's current size upon new object creation.
+        /// <param name="calculateCacheSize">If true, will calculate the cache's current size upon new object creation.
         /// Turned off by default as directory traversal is somewhat expensive and may not always be necessary based on
         /// use case.
         /// </param>
@@ -237,7 +233,7 @@ namespace System.Runtime.Caching
         /// <param name="binder">The SerializationBinder used to deserialize cached objects.  Needed if you plan
         /// to cache custom objects.
         /// </param>
-        /// <param name="calculateCacheSize">If true, will calcualte the cache's current size upon new object creation.
+        /// <param name="calculateCacheSize">If true, will calculate the cache's current size upon new object creation.
         /// Turned off by default as directory traversal is somewhat expensive and may not always be necessary based on
         /// use case.
         /// </param>
@@ -245,8 +241,7 @@ namespace System.Runtime.Caching
         public FileCache(
             SerializationBinder binder,
             bool calculateCacheSize = false,
-            TimeSpan cleanInterval = new TimeSpan()
-            )
+            TimeSpan cleanInterval = new TimeSpan())
         {
             _binder = binder;
             Init(DefaultCacheManager, calculateCacheSize, cleanInterval, true, false);
@@ -258,7 +253,7 @@ namespace System.Runtime.Caching
         /// <param name="cacheRoot">The cache's root file path</param>
         /// <param name="binder">The SerializationBinder used to deserialize cached objects.  Needed if you plan
         /// to cache custom objects.</param>
-        /// <param name="calculateCacheSize">If true, will calcualte the cache's current size upon new object creation.
+        /// <param name="calculateCacheSize">If true, will calculate the cache's current size upon new object creation.
         /// Turned off by default as directory traversal is somewhat expensive and may not always be necessary based on
         /// use case.
         /// </param>
@@ -267,8 +262,7 @@ namespace System.Runtime.Caching
             string cacheRoot,
             SerializationBinder binder,
             bool calculateCacheSize = false,
-            TimeSpan cleanInterval = new TimeSpan()
-            )
+            TimeSpan cleanInterval = new TimeSpan())
         {
             _binder = binder;
             CacheDir = cacheRoot;
@@ -282,7 +276,7 @@ namespace System.Runtime.Caching
         /// <param name="cacheRoot">The cache's root file path</param>
         /// <param name="binder">The SerializationBinder used to deserialize cached objects.  Needed if you plan
         /// to cache custom objects.</param>
-        /// <param name="calculateCacheSize">If true, will calcualte the cache's current size upon new object creation.
+        /// <param name="calculateCacheSize">If true, will calculate the cache's current size upon new object creation.
         /// Turned off by default as directory traversal is somewhat expensive and may not always be necessary based on
         /// use case.
         /// </param>
@@ -292,8 +286,7 @@ namespace System.Runtime.Caching
             string cacheRoot,
             SerializationBinder binder,
             bool calculateCacheSize = false,
-            TimeSpan cleanInterval = new TimeSpan()
-        )
+            TimeSpan cleanInterval = new TimeSpan())
         {
             _binder = binder;
             CacheDir = cacheRoot;
@@ -309,8 +302,7 @@ namespace System.Runtime.Caching
             bool calculateCacheSize = false,
             TimeSpan cleanInterval = new TimeSpan(),
             bool setCacheDirToDefault = true,
-            bool setBinderToDefault = true
-            )
+            bool setBinderToDefault = true)
         {   
             _name = "FileCache_" + _nameCounter;
             _nameCounter++;
@@ -487,12 +479,7 @@ namespace System.Runtime.Caching
                 if (cLock == null)
                     return 0;
 
-                IEnumerable<string> regions =
-                    string.IsNullOrEmpty(regionName)
-                        ? CacheManager.GetRegions()
-                        : new List<string>(1) { regionName };
-
-                foreach (var region in regions)
+                foreach (var region in this.GetRegions(regionName))
                 {
                     foreach (string key in GetKeys(region))
                     {
@@ -501,9 +488,7 @@ namespace System.Runtime.Caching
                         {
                             try
                             {
-                                string cachePath = CacheManager.GetCachePath(key, region);
-                                string policyPath = CacheManager.GetPolicyPath(key, region);
-                                CacheItemReference ci = new CacheItemReference(key, region, cachePath, policyPath);
+                                CacheItemReference ci = CreateCacheItemReference(region, key);
                                 Remove(key, region); // CT note: Remove will update CurrentCacheSize
                                 removed += ci.Length;
                             }
@@ -523,28 +508,29 @@ namespace System.Runtime.Caching
             return removed;
         }
 
+        private CacheItemReference CreateCacheItemReference(string region, string key)
+        {
+            string cachePath = CacheManager.GetCachePath(key, region);
+            string policyPath = CacheManager.GetPolicyPath(key, region);
+            return new CacheItemReference(key, region, cachePath, policyPath);
+        }
+
         /// <summary>
         /// Delete the oldest items in the cache to shrink the chache by the
         /// specified amount (in bytes).
         /// </summary>
         /// <returns>The amount of data that was actually removed</returns>
         private long DeleteOldestFiles(long amount, string regionName = null)
-        { 
+        {
             // Verify that we actually need to shrink
             if (amount <= 0)
-            { 
+            {
                 return 0;
             }
 
             //Heap of all CacheReferences
             PriortyQueue<CacheItemReference> cacheReferences = new PriortyQueue<CacheItemReference>();
-
-            IEnumerable<string> regions =
-                string.IsNullOrEmpty(regionName)
-                    ? CacheManager.GetRegions()
-                    : new List<string>(1) { regionName };
-
-            foreach (var region in regions)
+            foreach (var region in this.GetRegions(regionName))
             {
                 //build a heap of all files in cache region
                 foreach (string key in GetKeys(region))
@@ -552,9 +538,7 @@ namespace System.Runtime.Caching
                     try
                     {
                         //build item reference
-                        string cachePath = CacheManager.GetCachePath(key, region);
-                        string policyPath = CacheManager.GetPolicyPath(key, region);
-                        CacheItemReference ci = new CacheItemReference(key, region, cachePath, policyPath);
+                        CacheItemReference ci = CreateCacheItemReference(region, key);
                         cacheReferences.Enqueue(ci);
                     }
                     catch (FileNotFoundException)
@@ -565,14 +549,22 @@ namespace System.Runtime.Caching
 
             //remove cache items until size requirement is met
             long removedBytes = 0;
-            while(removedBytes < amount && cacheReferences.GetSize() > 0)
+            while (removedBytes < amount && cacheReferences.GetSize() > 0)
             {
                 //remove oldest item
                 CacheItemReference oldest = cacheReferences.Dequeue();
                 removedBytes += oldest.Length;
                 Remove(oldest.Key, oldest.Region);
             }
+
             return removedBytes;
+        }
+
+        private IEnumerable<string> GetRegions(string regionName)
+        {
+            return string.IsNullOrEmpty(regionName)
+                    ? CacheManager.GetRegions()
+                    : new List<string>(1) { regionName };
         }
 
         /// <summary>
@@ -620,12 +612,14 @@ namespace System.Runtime.Caching
             {
                 size += fi.Length;
             }
+
             // Add subdirectory sizes.
             var dis = root.EnumerateDirectories();
             foreach (DirectoryInfo di in dis)
             {
                 size += CacheSizeHelper(di);
             }
+
             return size;
         }
 
@@ -649,16 +643,19 @@ namespace System.Runtime.Caching
                 //if access timeout is not set, make really large wait time
                 timeToWait = new TimeSpan(5, 0, 0);
             }
+
             while (cacheLock == null && timeToWait > totalTime)
             {
                 cacheLock = GetCleaningLock();
                 Thread.Sleep(interval);
                 totalTime += interval;
             }
+
             if (cacheLock == null)
             {
                 throw new TimeoutException("FileCache AccessTimeout reached when attempting to clear cache.");
             }
+
             cacheLock.Close();
 
             //now that we've waited for everything to stop, we can delete the cache directory.
@@ -689,12 +686,7 @@ namespace System.Runtime.Caching
                     return;
                 }
 
-                IEnumerable<string> regions =
-                    string.IsNullOrEmpty(regionName)
-                        ? CacheManager.GetRegions()
-                        : new List<string>(1) { regionName };
-
-                foreach (var region in regions)
+                foreach (var region in this.GetRegions(regionName))
                 {
                     IEnumerable<string> keys = CacheManager.GetKeys(region);
                     foreach (string key in keys)
@@ -782,6 +774,7 @@ namespace System.Runtime.Caching
                     oldData = null;
                 }
             }
+
             SerializableCacheItemPolicy cachePolicy = new SerializableCacheItemPolicy(policy);
             FileCachePayload newPayload = new FileCachePayload(value, cachePolicy);
             WriteHelper(PayloadWriteMode, key, newPayload, regionName);
@@ -803,6 +796,7 @@ namespace System.Runtime.Caching
                     RegionName = value.RegionName
                 };
             }
+
             return returnItem;
         }
 
@@ -876,8 +870,7 @@ namespace System.Runtime.Caching
                     {
                         payload.Policy.AbsoluteExpiration = DateTime.Now.Add(payload.Policy.SlidingExpiration);
                         WriteHelper(PayloadWriteMode, key, payload, regionName, true);
-                    }
-                    
+                    }                    
                 }
             }
             else
@@ -888,16 +881,17 @@ namespace System.Runtime.Caching
                 //create dummy one for return
                 payload = new FileCachePayload(null);
             }
+
             return payload.Payload;
         }
 
         public override CacheItem GetCacheItem(string key, string regionName = null)
         {
-            object value = Get(key, regionName);
-            CacheItem item = new CacheItem(key);
-            item.Value = value;
-            item.RegionName = regionName;
-            return item;
+            return new CacheItem(key)
+            {
+                Value = this.Get(key, regionName),
+                RegionName = regionName
+            };
         }
 
         public override long GetCount(string regionName = null)
@@ -906,11 +900,9 @@ namespace System.Runtime.Caching
             {
                 regionName = "";
             }
+
             string path = Path.Combine(CacheDir, _cacheSubFolder, regionName);
-            if (Directory.Exists(path))
-                return Directory.GetFiles(path).Count();
-            else
-                return 0;
+            return Directory.Exists(path) ? Directory.GetFiles(path).Length : 0;
         }
 
         /// <summary>
@@ -921,21 +913,11 @@ namespace System.Runtime.Caching
         /// <returns></returns>
         public IEnumerator<KeyValuePair<string, object>> GetEnumerator(string regionName = null)
         {
-            string region = "";
-            if (string.IsNullOrEmpty(regionName) == false)
-            {
-                region = regionName;
-            }
-
-            //AC: This seems inefficient.  Wouldn't it be better to do this using a cursor?
-            List<KeyValuePair<string, object>> enumerator = new List<KeyValuePair<string, object>>();
-
             var keys = CacheManager.GetKeys(regionName);
             foreach (string key in keys)
             {
-                enumerator.Add(new KeyValuePair<string, object>(key, this.Get(key, regionName)));
+                yield return new KeyValuePair<string, object>(key, this.Get(key, regionName));
             }
-            return enumerator.GetEnumerator();
         }
 
         /// <summary>
@@ -966,11 +948,9 @@ namespace System.Runtime.Caching
         public override object Remove(string key, string regionName = null)
         {
             object valueToDelete = null;
-
-            
+                        
             if (Contains(key, regionName) == true)
             {
-
                 // Because of the possibility of multiple threads accessing this, it's possible that
                 // while we're trying to remove something, another thread has already removed it.
                 try
@@ -992,9 +972,9 @@ namespace System.Runtime.Caching
                 }
                 catch (IOException)
                 {
-                }
-                
+                }                
             }
+
             return valueToDelete;
         }
 
@@ -1026,23 +1006,6 @@ namespace System.Runtime.Caching
         }
 
         #endregion
-
-        private class LocalCacheBinder : System.Runtime.Serialization.SerializationBinder
-        {
-            public override Type BindToType(string assemblyName, string typeName)
-            {
-                Type typeToDeserialize = null;
-
-                String currentAssembly = Assembly.GetAssembly(typeof(LocalCacheBinder)).FullName;
-                assemblyName = currentAssembly;
-
-                // Get the type using the typeName and assemblyName
-                typeToDeserialize = Type.GetType(String.Format("{0}, {1}",
-                    typeName, assemblyName));
-
-                return typeToDeserialize;
-            }
-        }
 
         // CT: This private class is used to help shrink the cache. 
         // It computes the total size of an entry including it's policy file.
@@ -1092,20 +1055,12 @@ namespace System.Runtime.Caching
 
             public static bool operator >(CacheItemReference lhs, CacheItemReference rhs)
             {
-                if(lhs.CompareTo(rhs) > 0)
-                {
-                    return true;
-                }
-                return false;
+                return lhs.CompareTo(rhs) > 0;
             }
 
             public static bool operator <(CacheItemReference lhs, CacheItemReference rhs)
             {
-                if (lhs.CompareTo(rhs) < 0)
-                {
-                    return true;
-                }
-                return false;
+                return lhs.CompareTo(rhs) < 0;
             }
         }
     }
