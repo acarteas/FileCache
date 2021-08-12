@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Data.HashFunction;
-using System.Data.HashFunction.xxHash;
+using System.Text;
+using YYProject.XXHash;
+
 namespace System.Runtime.Caching
 {
     /// <summary>
@@ -11,7 +12,7 @@ namespace System.Runtime.Caching
     /// </summary>
     public class HashedFileCacheManager : FileCacheManager
     {
-        private static IxxHash _hasher = xxHashFactory.Instance.Create();
+        private static XXHash64 _hasher = new XXHash64();
         /// <summary>
         /// Returns a 64bit hash in hex of supplied key
         /// </summary>
@@ -19,8 +20,8 @@ namespace System.Runtime.Caching
         /// <returns></returns>
         public static string ComputeHash(string key)
         {
-            var hash = _hasher.ComputeHash(key, 64);
-            return hash.AsHexString();
+            _hasher.ComputeHash(Encoding.UTF8.GetBytes(key));
+            return _hasher.HashUInt64.ToString("x");
         }
 
         /// <summary>
