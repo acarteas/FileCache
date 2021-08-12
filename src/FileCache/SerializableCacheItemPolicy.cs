@@ -66,7 +66,7 @@ namespace System.Runtime.Caching
         {
             writer.Write(CACHE_VERSION);
 
-            writer.Write(AbsoluteExpiration.Date.ToBinary());
+            writer.Write(AbsoluteExpiration.DateTime.ToBinary());
             writer.Write(AbsoluteExpiration.Offset.TotalMilliseconds);
 
             writer.Write(SlidingExpiration.TotalMilliseconds);
@@ -100,7 +100,8 @@ namespace System.Runtime.Caching
                 return new SerializableCacheItemPolicy {
                     AbsoluteExpiration = new DateTimeOffset(DateTime.FromBinary(reader.ReadInt64()),
                                                             TimeSpan.FromMilliseconds(reader.ReadDouble())),
-                    SlidingExpiration = TimeSpan.FromMilliseconds(reader.ReadDouble()),
+                    // Don't clobber absolute by using sliding's setter; set the private value instead.
+                    _slidingExpiration = TimeSpan.FromMilliseconds(reader.ReadDouble()),
                     Key = reader.ReadString(),
                 };
             }

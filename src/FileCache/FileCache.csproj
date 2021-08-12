@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net45;net48;netstandard2.0;netstandard2.1</TargetFrameworks>
-	  <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <PackageTags>cache objectcache System.Runtime.Caching.ObjectCache</PackageTags>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <Authors>Adam Carter</Authors>
@@ -28,12 +28,12 @@
     <GenerateSerializationAssemblies>Auto</GenerateSerializationAssemblies>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0-*" PrivateAssets="All" />
-    <PackageReference Include="GitVersionTask" Version="5.3.2">
-      <PrivateAssets>All</PrivateAssets>
-    </PackageReference>
-  </ItemGroup>
+  <!-- <ItemGroup> -->
+  <!--   <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0-*" PrivateAssets="All" /> -->
+  <!--   <PackageReference Include="GitVersionTask" Version="5.3.2"> -->
+  <!--     <PrivateAssets>All</PrivateAssets> -->
+  <!--   </PackageReference> -->
+  <!-- </ItemGroup> -->
 
   <ItemGroup Condition=" '$(TargetFramework)' == 'net45' ">
     <Reference Include="System.Runtime.Caching" />
