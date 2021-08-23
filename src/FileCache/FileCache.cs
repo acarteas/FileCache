@@ -608,12 +608,14 @@ namespace System.Runtime.Caching
             {
                 size += fi.Length;
             }
+
             // Add subdirectory sizes.
             var dis = root.EnumerateDirectories();
             foreach (DirectoryInfo di in dis)
             {
                 size += CacheSizeHelper(di);
             }
+
             return size;
         }
 
@@ -743,10 +745,9 @@ namespace System.Runtime.Caching
 
             //check to see if limit was reached
             if (CurrentCacheSize > MaxCacheSize)
-                if (CurrentCacheSize > MaxCacheSize)
-                {
-                    MaxCacheSizeReached(this, new FileCacheEventArgs(CurrentCacheSize, MaxCacheSize));
-                }
+            {
+                MaxCacheSizeReached(this, new FileCacheEventArgs(CurrentCacheSize, MaxCacheSize));
+            }
         }
 
         #endregion
@@ -954,7 +955,6 @@ namespace System.Runtime.Caching
         public override object Remove(string key, string regionName = null)
         {
             object valueToDelete = null;
-
 
             if (Contains(key, regionName) == true)
             {

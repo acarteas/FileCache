@@ -284,11 +284,11 @@ namespace System.Runtime.Caching
                 using (BinaryWriter writer = new BinaryWriter(stream))
                 {
                     data.Policy.Serialize(writer);
-
-                    // adjust cache size
-                    cacheSizeDelta += new FileInfo(cachedPolicy).Length;
                 }
             }
+
+            // Adjust cache size outside of the using blocks to ensure it's after the data is written.
+            cacheSizeDelta += new FileInfo(cachedPolicy).Length;
 
             return cacheSizeDelta;
         }
