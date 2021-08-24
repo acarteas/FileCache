@@ -489,6 +489,18 @@ namespace System.Runtime.Caching
         }
 
         /// <summary>
+        /// Writes a long to a system file that is not part of the cache itself,
+        /// but is used to help it function.
+        /// </summary>
+        /// <param name="filename">The name of the sysfile (without directory)</param>
+        /// <param name="data">The DateTime to write to the file</param>
+        public void WriteSysValue(string filename, DateTime data)
+        {
+            // Convert to long and use long's function.
+            WriteSysValue(filename, data.ToBinary());
+        }
+
+        /// <summary>
         /// This function servies to centralize file stream access within this class.
         /// </summary>
         /// <param name="path"></param>

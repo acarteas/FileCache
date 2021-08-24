@@ -692,8 +692,9 @@ namespace System.Runtime.Caching
                         string policyPath = CacheManager.GetPolicyPath(key, region);
                         string cachePath = CacheManager.GetCachePath(key, region);
 
-                        // Update the Cache size
+                        // Update the Cache size before flushing this item.
                         CurrentCacheSize = GetCacheSize();
+
                         //if either policy or cache are stale, delete both
                         if (File.GetLastAccessTime(policyPath) < minDate || File.GetLastAccessTime(cachePath) < minDate)
                         {
@@ -706,6 +707,7 @@ namespace System.Runtime.Caching
                 cLock.Close();
             }
         }
+
         /// <summary>
         /// Returns the policy attached to a given cache item.
         /// </summary>
