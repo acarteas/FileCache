@@ -7,13 +7,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.4.0" />
-    <PackageReference Include="MSTest.TestAdapter" Version="2.0.0" />
-    <PackageReference Include="MSTest.TestFramework" Version="2.0.0" />
-    <PackageReference Include="FluentAssertions" Version="5.9.0" />
-    
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.11.0" />
+    <PackageReference Include="MSTest.TestAdapter" Version="2.2.5" />
+    <PackageReference Include="MSTest.TestFramework" Version="2.2.5" />
+    <PackageReference Include="FluentAssertions" Version="6.1.0" />
   </ItemGroup>
 
+  <ItemGroup Condition=" '$(TargetFramework)' == 'netcoreapp5.0'">
+    <Reference Include="System.Runtime.Caching" />
+  </ItemGroup>
   <ItemGroup Condition=" '$(TargetFramework)' == 'net40' ">
     <Reference Include="System.Runtime.Caching" />
   </ItemGroup>
@@ -28,6 +30,8 @@
     <ProjectReference Include="..\FileCache\FileCache.csproj" />
   </ItemGroup>
 
+  <!-- VisualStudio creates this when it notices a project includes tests. It tells VisualStudio to open the Test Explorer package. -->
+  <!-- Not sure if just VS or also VSCode... -->
   <ItemGroup>
     <Service Include="{82a7f48d-3b50-4b1e-b82e-3ada8210c358}" />
   </ItemGroup>
