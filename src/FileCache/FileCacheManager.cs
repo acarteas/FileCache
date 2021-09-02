@@ -97,6 +97,35 @@ namespace System.Runtime.Caching
             return data;
         }
 
+        protected SerializableCacheItemPolicy DeserializePolicyData(string policyPath)
+        {
+            SerializableCacheItemPolicy policy = null;
+            try
+            {
+                if (File.Exists(policyPath))
+                {
+                    using (FileStream stream = GetStream(policyPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                    {
+                        using (BinaryReader reader = new BinaryReader(stream))
+                        {
+                            // TODO: In part of the merge it looked like the policy was force serialized with LocalCacheBinder(), is this intended?
+                            policy = SerializableCacheItemPolicy.Deserialize(reader, stream.Length);
+                        }
+                    }
+                }
+                else
+                {
+                    policy = new SerializableCacheItemPolicy();
+                }
+            }
+            catch
+            {
+                policy = new SerializableCacheItemPolicy();
+            }
+
+            return policy;
+        }
+
         /// <summary>
         /// This function serves to centralize file reads within this class.
         /// </summary>
@@ -125,28 +154,9 @@ namespace System.Runtime.Caching
                 default:
                     throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
             }
-            try
-            {
-                if (File.Exists(policyPath))
-                {
-                    using (FileStream stream = GetStream(policyPath, FileMode.Open, FileAccess.Read, FileShare.Read))
-                    {
-                        using (BinaryReader reader = new BinaryReader(stream))
-                        {
-                            // TODO: In part of the merge it looked like the policy was force serialized with LocalCacheBinder(), is this intended?
-                            payload.Policy = SerializableCacheItemPolicy.Deserialize(reader, stream.Length);
-                        }
-                    }
-                }
-                else
-                {
-                    payload.Policy = new SerializableCacheItemPolicy();
-                }
-            }
-            catch
-            {
-                payload.Policy = new SerializableCacheItemPolicy();
-            }
+
+            payload.Policy = DeserializePolicyData(policyPath);
+
             return payload;
         }
 

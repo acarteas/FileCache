@@ -12,6 +12,7 @@ namespace System.Runtime.Caching
     public class HashedFileCacheManager : FileCacheManager
     {
         private static IxxHash _hasher = xxHashFactory.Instance.Create();
+
         /// <summary>
         /// Returns a 64bit hash in hex of supplied key
         /// </summary>
@@ -54,7 +55,7 @@ namespace System.Runtime.Caching
                     //check for correct key
                     try
                     {
-                        SerializableCacheItemPolicy policy = Deserialize(fileName) as SerializableCacheItemPolicy;
+                        SerializableCacheItemPolicy policy = DeserializePolicyData(fileName);
                         if (key.CompareTo(policy.Key) == 0)
                         {
                             //correct key found!
@@ -124,7 +125,7 @@ namespace System.Runtime.Caching
                 {
                     try
                     {
-                        SerializableCacheItemPolicy policy = Deserialize(file) as SerializableCacheItemPolicy;
+                        SerializableCacheItemPolicy policy = DeserializePolicyData(file);
                         keys.Add(policy.Key);
                     }
                     catch
