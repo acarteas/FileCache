@@ -29,9 +29,8 @@ namespace System.Runtime.Caching
         private const string LastCleanedDateFile = "cache.lcd";
         private const string CacheSizeFile = "cache.size";
         // this is a file used to prevent multiple processes from trying to "clean" at the same time
-        private const string SemaphoreFile = "cache.sem"; 
+        private const string SemaphoreFile = "cache.sem";
         private long _currentCacheSize = 0;
-        private PayloadMode _readMode = PayloadMode.Serializable;
         public string CacheDir { get; protected set; }
 
         /// <summary>
@@ -52,7 +51,7 @@ namespace System.Runtime.Caching
 
         /// <summary>
         /// Used to abstract away the low-level details of file management.  This allows
-        /// for multiple file formatting schemes based on use case.  
+        /// for multiple file formatting schemes based on use case.
         /// </summary>
         public FileCacheManager CacheManager { get; protected set; }
 
@@ -88,16 +87,7 @@ namespace System.Runtime.Caching
         /// <summary>
         /// Specified whether the payload is deserialized or just the file name.
         /// </summary>
-        public PayloadMode PayloadReadMode {
-            get => _readMode;
-            set {
-                if (value == PayloadMode.RawBytes)
-                {
-                    throw new ArgumentException("The read mode cannot be set to RawBytes. Use the file name please.");
-                }
-                _readMode = value;
-            }
-        }
+        public PayloadMode PayloadReadMode { get; set; } = PayloadMode.Serializable;
 
         /// <summary>
         /// Specified how the payload is to be handled on add operations.
@@ -112,7 +102,7 @@ namespace System.Runtime.Caching
         public TimeSpan FilenameAsPayloadSafetyMargin = TimeSpan.FromMinutes(10);
 
         /// <summary>
-        /// Used to determine how long the FileCache will wait for a file to become 
+        /// Used to determine how long the FileCache will wait for a file to become
         /// available.  Default (00:00:00) is indefinite.  Should the timeout be
         /// reached, an exception will be thrown.
         /// </summary>
@@ -136,7 +126,7 @@ namespace System.Runtime.Caching
         /// <summary>
         /// Returns the approximate size of the file cache
         /// </summary>
-        public long CurrentCacheSize 
+        public long CurrentCacheSize
         {
             get
             {
@@ -144,12 +134,11 @@ namespace System.Runtime.Caching
                 if (_currentCacheSize == 0)
                 {
                     // Read the system file for cache size
-                    object cacheSizeObj = CacheManager.ReadSysFile(CacheSizeFile);
-
-                    // Did we successfully get data from the file?
-                    if (cacheSizeObj != null)
+                    long cacheSize;
+                    if (CacheManager.ReadSysValue(CacheSizeFile, out cacheSize))
                     {
-                        _currentCacheSize = (long) cacheSizeObj;
+                        // Did we successfully get data from the file? Write it to our member var.
+                        _currentCacheSize = cacheSize;
                     }
                 }
 
@@ -160,10 +149,10 @@ namespace System.Runtime.Caching
                 // no need to do a pointless re-store of the same value
                 if (_currentCacheSize != value || value == 0)
                 {
-                    CacheManager.WriteSysFile(CacheSizeFile, value);
+                    CacheManager.WriteSysValue(CacheSizeFile, value);
                     _currentCacheSize = value;
                 }
-            } 
+            }
         }
 
         /// <summary>
@@ -171,7 +160,7 @@ namespace System.Runtime.Caching
         /// </summary>
         public event EventHandler<FileCacheEventArgs> MaxCacheSizeReached = delegate { };
 
-        public event EventHandler<FileCacheEventArgs> CacheResized = delegate { }; 
+        public event EventHandler<FileCacheEventArgs> CacheResized = delegate { };
 
         /// <summary>
         /// The default cache path used by FC.
@@ -311,10 +300,10 @@ namespace System.Runtime.Caching
             bool setCacheDirToDefault = true,
             bool setBinderToDefault = true
             )
-        {   
+        {
             _name = "FileCache_" + _nameCounter;
             _nameCounter++;
-            
+
             DefaultRegion = null;
             DefaultPolicy = new CacheItemPolicy();
             MaxCacheSize = long.MaxValue;
@@ -337,7 +326,7 @@ namespace System.Runtime.Caching
 
             // only set the clean interval if the user supplied it
             if (cleanInterval > new TimeSpan())
-            { 
+            {
                 _cleanInterval = cleanInterval;
             }
 
@@ -356,7 +345,7 @@ namespace System.Runtime.Caching
             }
             else if (calculateCacheSize || CurrentCacheSize == 0)
             {
-                // This is in an else if block, because CleanCacheAsync will 
+                // This is in an else if block, because CleanCacheAsync will
                 // update the cache size, so no need to do it twice.
                 UpdateCacheSizeAsync();
             }
@@ -395,11 +384,10 @@ namespace System.Runtime.Caching
             try
             {
                 // if the file can't be found, or is corrupt this will throw an exception
-                DateTime? lastClean = CacheManager.ReadSysFile(LastCleanedDateFile) as DateTime?;
-
-                //AC: rewrote to be safer in null cases
-                if (lastClean == null)
+                DateTime lastClean;
+                if (!CacheManager.ReadSysValue(LastCleanedDateFile, out lastClean))
                 {
+                    //AC: rewrote to be safer in cases where no value obtained.
                     return true;
                 }
 
@@ -422,7 +410,7 @@ namespace System.Runtime.Caching
         public long ShrinkCacheToSize(long newSize, string regionName = null)
         {
             long originalSize = 0, amount = 0, removed = 0;
-            
+
             //lock down other treads from trying to shrink or clean
             using (FileStream cLock = GetCleaningLock())
             {
@@ -480,7 +468,7 @@ namespace System.Runtime.Caching
         public long CleanCache(string regionName = null)
         {
             long removed = 0;
-            
+
             //lock down other treads from trying to shrink or clean
             using (FileStream cLock = GetCleaningLock())
             {
@@ -514,7 +502,7 @@ namespace System.Runtime.Caching
                 }
 
                 // mark that we've cleaned the cache
-                CacheManager.WriteSysFile(LastCleanedDateFile, DateTime.Now);
+                CacheManager.WriteSysValue(LastCleanedDateFile, DateTime.Now);
 
                 // unlock
                 cLock.Close();
@@ -529,10 +517,10 @@ namespace System.Runtime.Caching
         /// </summary>
         /// <returns>The amount of data that was actually removed</returns>
         private long DeleteOldestFiles(long amount, string regionName = null)
-        { 
+        {
             // Verify that we actually need to shrink
             if (amount <= 0)
-            { 
+            {
                 return 0;
             }
 
@@ -576,7 +564,7 @@ namespace System.Runtime.Caching
         }
 
         /// <summary>
-        /// This method calls GetCacheSize on a separate thread to 
+        /// This method calls GetCacheSize on a separate thread to
         /// calculate and then store the size of the cache.
         /// </summary>
         public void UpdateCacheSizeAsync()
@@ -620,12 +608,14 @@ namespace System.Runtime.Caching
             {
                 size += fi.Length;
             }
+
             // Add subdirectory sizes.
             var dis = root.EnumerateDirectories();
             foreach (DirectoryInfo di in dis)
             {
                 size += CacheSizeHelper(di);
             }
+
             return size;
         }
 
@@ -702,8 +692,9 @@ namespace System.Runtime.Caching
                         string policyPath = CacheManager.GetPolicyPath(key, region);
                         string cachePath = CacheManager.GetCachePath(key, region);
 
-                        // Update the Cache size
+                        // Update the Cache size before flushing this item.
                         CurrentCacheSize = GetCacheSize();
+
                         //if either policy or cache are stale, delete both
                         if (File.GetLastAccessTime(policyPath) < minDate || File.GetLastAccessTime(cachePath) < minDate)
                         {
@@ -716,8 +707,9 @@ namespace System.Runtime.Caching
                 cLock.Close();
             }
         }
+
         /// <summary>
-        /// Returns the policy attached to a given cache item.  
+        /// Returns the policy attached to a given cache item.
         /// </summary>
         /// <param name="key">The key of the item</param>
         /// <param name="regionName">The region in which the key exists</param>
@@ -755,10 +747,9 @@ namespace System.Runtime.Caching
 
             //check to see if limit was reached
             if (CurrentCacheSize > MaxCacheSize)
-                if (CurrentCacheSize > MaxCacheSize)
-                {
-                    MaxCacheSizeReached(this, new FileCacheEventArgs(CurrentCacheSize, MaxCacheSize));
-                }
+            {
+                MaxCacheSizeReached(this, new FileCacheEventArgs(CurrentCacheSize, MaxCacheSize));
+            }
         }
 
         #endregion
@@ -837,7 +828,7 @@ namespace System.Runtime.Caching
                     ;
             }
         }
-        
+
         public override object Get(string key, string regionName = null)
         {
             FileCachePayload payload = CacheManager.ReadFile(PayloadReadMode, key, regionName) as FileCachePayload;
@@ -861,7 +852,7 @@ namespace System.Runtime.Caching
                     //delete the file from the cache
                     try
                     {
-                        // CT Note: I changed this to Remove from File.Delete so that the coresponding 
+                        // CT Note: I changed this to Remove from File.Delete so that the coresponding
                         // policy file will be deleted as well, and CurrentCacheSize will be updated.
                         Remove(key, regionName);
                     }
@@ -877,7 +868,7 @@ namespace System.Runtime.Caching
                         payload.Policy.AbsoluteExpiration = DateTime.Now.Add(payload.Policy.SlidingExpiration);
                         WriteHelper(PayloadWriteMode, key, payload, regionName, true);
                     }
-                    
+
                 }
             }
             else
@@ -967,7 +958,6 @@ namespace System.Runtime.Caching
         {
             object valueToDelete = null;
 
-            
             if (Contains(key, regionName) == true)
             {
 
@@ -993,7 +983,7 @@ namespace System.Runtime.Caching
                 catch (IOException)
                 {
                 }
-                
+
             }
             return valueToDelete;
         }
@@ -1044,7 +1034,7 @@ namespace System.Runtime.Caching
             }
         }
 
-        // CT: This private class is used to help shrink the cache. 
+        // CT: This private class is used to help shrink the cache.
         // It computes the total size of an entry including it's policy file.
         // It also implements IComparable functionality to allow for sorting based on access time
         private class CacheItemReference : IComparable<CacheItemReference>

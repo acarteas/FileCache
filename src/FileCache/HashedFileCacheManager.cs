@@ -12,6 +12,7 @@ namespace System.Runtime.Caching
     public class HashedFileCacheManager : FileCacheManager
     {
         private static IxxHash _hasher = xxHashFactory.Instance.Create();
+
         /// <summary>
         /// Returns a 64bit hash in hex of supplied key
         /// </summary>
@@ -54,7 +55,7 @@ namespace System.Runtime.Caching
                     //check for correct key
                     try
                     {
-                        SerializableCacheItemPolicy policy = Deserialize(fileName) as SerializableCacheItemPolicy;
+                        SerializableCacheItemPolicy policy = DeserializePolicyData(fileName);
                         if (key.CompareTo(policy.Key) == 0)
                         {
                             //correct key found!
@@ -85,7 +86,7 @@ namespace System.Runtime.Caching
         }
 
         /// <summary>
-        /// Builds a string that will place the specified file name within the appropriate 
+        /// Builds a string that will place the specified file name within the appropriate
         /// cache and workspace folder.
         /// </summary>
         /// <param name="key"></param>
@@ -106,7 +107,7 @@ namespace System.Runtime.Caching
         }
 
         /// <summary>
-        /// Returns a list of keys for a given region.  
+        /// Returns a list of keys for a given region.
         /// </summary>
         /// <param name="regionName"></param>
         public override IEnumerable<string> GetKeys(string regionName = null)
@@ -124,7 +125,7 @@ namespace System.Runtime.Caching
                 {
                     try
                     {
-                        SerializableCacheItemPolicy policy = Deserialize(file) as SerializableCacheItemPolicy;
+                        SerializableCacheItemPolicy policy = DeserializePolicyData(file);
                         keys.Add(policy.Key);
                     }
                     catch
