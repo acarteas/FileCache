@@ -11,7 +11,7 @@
     <SignAssembly>True</SignAssembly>
 	  <PublicSign Condition="'$(OS)' != 'Windows_NT'">true</PublicSign>
     <UpdateVersionProperties>true</UpdateVersionProperties>
-    <Version>3.1.0</Version>
+    <Version>3.3.0</Version>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 
     <DebugSymbols>True</DebugSymbols>
