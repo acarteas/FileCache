@@ -81,7 +81,11 @@ namespace System.Runtime.Caching
             /// <summary>
             /// Treat the paylad as raw bytes. A byte[] and readable streams are supported on add.
             /// </summary>
-            RawBytes
+            RawBytes,
+            /// <summary>
+            /// Treat the payload as a crypto serializable object.
+            /// </summary>
+            CryptoSerializable,
         }
 
         /// <summary>

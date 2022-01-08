@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 
@@ -21,6 +22,7 @@ namespace System.Runtime.Caching
         public string CacheSubFolder { get; set; }
         public string PolicySubFolder { get; set; }
         public SerializationBinder Binder { get; set; }
+        public string CryptoKey { get; set; }
 
         /// <summary>
         /// Used to determine how long the FileCache will wait for a file to become
@@ -151,6 +153,9 @@ namespace System.Runtime.Caching
                 case FileCache.PayloadMode.RawBytes:
                     payload.Payload = LoadRawPayloadData(cachePath);
                     break;
+                case FileCache.PayloadMode.CryptoSerializable:
+                    payload.Payload = DeserializeCrypto(cachePath);
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
             }
@@ -222,6 +227,54 @@ namespace System.Runtime.Caching
             }
             return data;
         }
+        protected virtual object DeserializeCrypto(string fileName, SerializationBinder objectBinder = null)
+        {
+            object data = null;
+            if (File.Exists(fileName))
+            {
+                AesCryptoServiceProvider aes = new AesCryptoServiceProvider();
+                MD5CryptoServiceProvider md5 = new MD5CryptoServiceProvider();
+                SHA256CryptoServiceProvider sha256 = new SHA256CryptoServiceProvider();
+                byte[] aeskey = sha256.ComputeHash(Encoding.UTF8.GetBytes(CryptoKey));
+                byte[] aesiv = md5.ComputeHash(Encoding.UTF8.GetBytes(CryptoKey));
+                aes.Key = aeskey;
+                aes.IV = aesiv;
+
+                using (FileStream stream = GetStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read))
+                {
+                    using (Stream cryptoStream = new CryptoStream(stream, aes.CreateDecryptor(), CryptoStreamMode.Read))
+                    {
+                        BinaryFormatter formatter = new BinaryFormatter();
+
+                        //AC: From http://spazzarama.com//2009/06/25/binary-deserialize-unable-to-find-assembly/
+                        //    Needed to deserialize custom objects
+                        if (objectBinder != null)
+                        {
+                            //take supplied binder over default binder
+                            formatter.Binder = objectBinder;
+                        }
+                        else if (Binder != null)
+                        {
+                            formatter.Binder = Binder;
+                        }
+                        try
+                        {
+                            data = formatter.Deserialize(cryptoStream);
+                        }
+                        catch (SerializationException)
+                        {
+                            data = null;
+                        }
+                        finally
+                        {
+                            cryptoStream.Close();
+                            stream.Close();
+                        }
+                    }
+                }
+            }
+            return data;
+        }
 
         /// <summary>
         /// This function serves to centralize file writes within this class
@@ -275,6 +328,23 @@ namespace System.Runtime.Caching
 
                     case FileCache.PayloadMode.Filename:
                         File.Copy((string)data.Payload, cachedItemPath, true);
+                        break;
+                    case FileCache.PayloadMode.CryptoSerializable:
+                        AesCryptoServiceProvider aes = new AesCryptoServiceProvider();
+                        MD5CryptoServiceProvider md5 = new MD5CryptoServiceProvider();
+                        SHA256CryptoServiceProvider sha256 = new SHA256CryptoServiceProvider();
+                        byte[] aeskey = sha256.ComputeHash(Encoding.UTF8.GetBytes(CryptoKey));
+                        byte[] aesiv = md5.ComputeHash(Encoding.UTF8.GetBytes(CryptoKey));
+                        aes.Key = aeskey;
+                        aes.IV = aesiv;
+                        using (FileStream stream = GetStream(cachedItemPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                        {
+                            using (CryptoStream cryptoStream = new CryptoStream(stream, aes.CreateEncryptor(), CryptoStreamMode.Write))
+                            {
+                                BinaryFormatter formatter = new BinaryFormatter();
+                                formatter.Serialize(cryptoStream, data.Payload);
+                            }
+                        }
                         break;
                 }
 
