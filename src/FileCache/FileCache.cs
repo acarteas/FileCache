@@ -341,7 +341,6 @@ namespace System.Runtime.Caching
             CacheManager.PolicySubFolder = _policySubFolder;
             CacheManager.Binder = _binder;
             CacheManager.AccessTimeout = new TimeSpan();
-            //CacheManager.CryptoKey = cryptoKey;
 
             //check to see if cache is in need of immediate cleaning
             if (ShouldClean())
