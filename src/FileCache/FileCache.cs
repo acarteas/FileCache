@@ -81,7 +81,11 @@ namespace System.Runtime.Caching
             /// <summary>
             /// Treat the paylad as raw bytes. A byte[] and readable streams are supported on add.
             /// </summary>
-            RawBytes
+            RawBytes,
+            /// <summary>
+            /// Treat the payload as a crypto serializable object.
+            /// </summary>
+            CryptoSerializable,
         }
 
         /// <summary>
@@ -337,6 +341,7 @@ namespace System.Runtime.Caching
             CacheManager.PolicySubFolder = _policySubFolder;
             CacheManager.Binder = _binder;
             CacheManager.AccessTimeout = new TimeSpan();
+            //CacheManager.CryptoKey = cryptoKey;
 
             //check to see if cache is in need of immediate cleaning
             if (ShouldClean())
